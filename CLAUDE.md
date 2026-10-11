@@ -22,15 +22,19 @@
 - 睡眠データの取得は `SleepSource` インターフェース(`ButtonSleepSource` / `DemoSleepSource` / `HealthKitSleepSource`)。
 - 同期は匿名アカウント+引き継ぎコード。競合は行ごとに「あとから更新した方」(サーバー時刻)。
 
-## コマンド(雛形ができたら、実際の値に直す)
+## コマンド
+
+Node.js は 22 以上が必要(`.nvmrc` あり。`nvm use` で切り替える)。pnpm は `corepack enable` で入る。
 
 ```
 pnpm install
 pnpm -F @nekase/core test        # 計算ロジックのテスト
 pnpm -F mobile web               # Web版を起動
-pnpm -F api dev                  # API をローカル起動(wrangler dev)
-pnpm -r typecheck
-pnpm -r lint
+pnpm -F api dev                  # API をローカル起動(wrangler dev。http://localhost:8787/health で確認)
+pnpm typecheck                   # 全パッケージの型チェック
+pnpm lint
+pnpm test
+pnpm check                       # typecheck + lint + test をまとめて実行
 ```
 
 ## 作業のルール

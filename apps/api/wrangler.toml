@@ -1,0 +1,5 @@
+name = "nekase-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# D1 はステップ6で追加する(アカウント ID などはここに書いたらチャットに貼らない)
