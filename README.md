@@ -25,7 +25,7 @@ pnpm ワークスペースです。
 | `apps/api` | Cloudflare Workers + Hono + Zod + D1 |
 | `packages/core` | 計算ロジック(積立、複利の分解、判断力ゲージ、FX の損益など)。アプリと API の両方が使う |
 
-> 現在は計画段階で、`apps/` と `packages/` はこれから作ります。
+> 現在は雛形ができた段階です(画面と計算ロジックはこれから作ります)。
 
 ## ドキュメント
 
@@ -34,15 +34,17 @@ pnpm ワークスペースです。
 - [`docs/prototype/nekase.html`](docs/prototype/nekase.html): Web のプロトタイプ(単一ファイル)。ロジックと見た目の見本です。ブラウザで開くと動きます。
 - [`CLAUDE.md`](CLAUDE.md): Claude Code 用のプロジェクト指示。
 
-## 開発の始め方(雛形ができたら有効になります)
+## 開発の始め方
+
+Node.js 22 以上が必要です(`nvm use` で `.nvmrc` の版に切り替えられます)。
 
 ```sh
+corepack enable             # pnpm を使えるようにする(最初の1回)
 pnpm install
 pnpm -F @nekase/core test   # 計算ロジックのテスト
 pnpm -F mobile web          # Web 版を起動
-pnpm -F api dev             # API をローカル起動
-pnpm -r typecheck
-pnpm -r lint
+pnpm -F api dev             # API をローカル起動(http://localhost:8787/health)
+pnpm check                  # 型チェック + lint + テスト
 ```
 
 ## 進め方のルール
