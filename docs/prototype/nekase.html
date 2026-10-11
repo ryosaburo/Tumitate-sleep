@@ -1,0 +1,946 @@
+<title>ねかせ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: 1カラムのスマホ幅アプリ(最大420px)。主役は睡眠と資産を同じ日付軸に重ねた二段グラフ。下部固定バーは、デモでは日付の操作、自分の記録では「ねる/おきた」ボタン。 */
+:root {
+  --bg: #EEF0F7;
+  --surface: #FFFFFF;
+  --surface-2: #E5E8F3;
+  --ink: #161A38;
+  --ink-2: #464C70;
+  --ink-3: #5C6388;
+  --line: #D6DAEA;
+  --band: #D9DEF6;
+  --sleep: #4452B8;
+  --sleep-ink: #3341A6;
+  --on-sleep: #FFFFFF;
+  --asset: #D9791C;
+  --asset-ink: #9F4E08;
+  --asset-soft: #F6DDBE;
+  --l1: #E9C690;
+  --l2: #D9791C;
+  --l3: #8F3D07;
+  --good: #1B8756;
+  --good-ink: #12643F;
+  --good-soft: #D6EFE2;
+  --on-good: #FFFFFF;
+  --font-body: 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', sans-serif;
+  --font-num: 'DM Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1024; --surface: #171B3A; --surface-2: #222755; --ink: #ECEEFB; --ink-2: #B9BEDD; --ink-3: #98A0C8;
+    --line: #2D3463; --band: #2B3270; --sleep: #7F8CE6; --sleep-ink: #AEB8FF; --on-sleep: #0D1024;
+    --asset: #C77D2E; --asset-ink: #F2B26B; --asset-soft: #4B3518; --l1: #7A5A33; --l2: #C77D2E; --l3: #F6CF98;
+    --good: #5CD6A0; --good-ink: #7BE3B2; --good-soft: #173A2E; --on-good: #0D1024;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1024; --surface: #171B3A; --surface-2: #222755; --ink: #ECEEFB; --ink-2: #B9BEDD; --ink-3: #98A0C8;
+  --line: #2D3463; --band: #2B3270; --sleep: #7F8CE6; --sleep-ink: #AEB8FF; --on-sleep: #0D1024;
+  --asset: #C77D2E; --asset-ink: #F2B26B; --asset-soft: #4B3518; --l1: #7A5A33; --l2: #C77D2E; --l3: #F6CF98;
+  --good: #5CD6A0; --good-ink: #7BE3B2; --good-soft: #173A2E; --on-good: #0D1024;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.6;
+  padding-inline: 16px; padding-block: 18px 116px; -webkit-text-size-adjust: 100%;
+}
+.app { max-width: 420px; margin-inline: auto; display: flex; flex-direction: column; gap: 14px; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--sleep); outline-offset: 2px; }
+
+.top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.moon { fill: var(--sleep); flex: none; }
+.logo { font-weight: 900; font-size: 26px; letter-spacing: .04em; line-height: 1.1; }
+.tag { font-size: 12px; color: var(--ink-3); line-height: 1.4; }
+.pill { font-size: 11px; padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-2); background: var(--surface); white-space: nowrap; }
+
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; background: var(--surface-2); border-radius: 14px; }
+.tab { appearance: none; border: 0; background: transparent; color: var(--ink-2); font-weight: 700; font-size: 14px; padding: 9px 6px; border-radius: 10px; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(22, 26, 56, .14); }
+
+main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.card h3 { margin: 0; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; }
+.note { font-size: 12px; color: var(--ink-3); line-height: 1.5; margin: 0; }
+.fine { font-size: 11.5px; color: var(--ink-3); line-height: 1.6; margin: 4px 2px 0; }
+.banner { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; padding: 10px 14px; border-radius: 14px; background: var(--surface-2); font-size: 13px; color: var(--ink-2); }
+
+.stats { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; align-items: end; }
+.stat { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.stat .k { font-size: 12px; color: var(--ink-3); line-height: 1.4; }
+.stat .v { font-family: var(--font-num); font-weight: 500; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.stat .u { font-family: var(--font-body); font-size: 15px; margin-left: 3px; color: var(--ink-2); }
+.stat .s { font-size: 12px; color: var(--ink-2); line-height: 1.4; }
+.stat.sleep .v { font-size: 42px; color: var(--sleep-ink); }
+.stat.asset .v { font-size: 22px; color: var(--asset-ink); }
+
+.chart { width: 100%; height: auto; display: block; touch-action: pan-y; cursor: ew-resize; user-select: none; -webkit-user-select: none; }
+.chart text { font-family: var(--font-num); font-size: 10px; fill: var(--ink-3); }
+.chart .cap { font-family: var(--font-body); font-size: 10.5px; fill: var(--ink-2); }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .wk { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 3; }
+.chart .band { fill: var(--band); }
+.chart .bar { fill: var(--sleep); }
+.chart .bar.off { opacity: .4; }
+.chart .l1 { fill: var(--l1); stroke: var(--surface); stroke-width: 1.2; }
+.chart .l2 { fill: var(--l2); stroke: var(--surface); stroke-width: 1.2; }
+.chart .l3 { fill: var(--l3); stroke: var(--surface); stroke-width: 1.2; }
+.chart .loss { fill: url(#hatch); }
+.chart .total { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.chart .cursor { stroke: var(--ink); stroke-width: 1; opacity: .45; }
+.chart .dip { fill: var(--ink); opacity: .1; }
+.chart .dot-end { fill: var(--ink); stroke: var(--surface); stroke-width: 2; }
+.chart .mk { fill: var(--ink); }
+.chart .mk-t { fill: var(--bg); font-weight: 500; }
+.chart .dip-t { fill: var(--asset-ink); font-family: var(--font-body); font-size: 10.5px; }
+@keyframes rise { from { transform: scaleY(.15); opacity: .2; } to { transform: none; } }
+.chart .bar.cur { transform-box: fill-box; transform-origin: 50% 0; animation: rise .4s ease-out; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; font-size: 11.5px; color: var(--ink-2); }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.sw.bar { background: var(--sleep); }
+.sw.band { background: var(--band); border: 1px solid var(--line); }
+.sw.faint { background: var(--sleep); opacity: .4; }
+.sw.line { height: 3px; background: var(--ink); border-radius: 2px; }
+.sw.l1 { background: var(--l1); }
+.sw.l2 { background: var(--l2); }
+.sw.l3 { background: var(--l3); }
+.sw.loss, .bkbar .loss { background: repeating-linear-gradient(45deg, var(--ink-3) 0 1.5px, transparent 1.5px 4px); border: 1px solid var(--line); }
+.sw.ghost { background: transparent; }
+
+.bkbar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; gap: 2px; background: var(--surface-2); }
+.bkbar i { display: block; height: 100%; }
+.bkbar .l1 { background: var(--l1); }
+.bkbar .l2 { background: var(--l2); }
+.bkbar .l3 { background: var(--l3); }
+.bk { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.bk li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.bk li:first-child { border-top: 0; padding-top: 2px; }
+.bk small { display: block; color: var(--ink-3); font-size: 12px; line-height: 1.4; }
+.bk b { font-family: var(--font-num); font-weight: 500; font-variant-numeric: tabular-nums; }
+.bk li.total { font-weight: 700; }
+
+.night { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.range { font-family: var(--font-num); font-size: 28px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--sleep-ink); }
+.range i { font-style: normal; color: var(--ink-3); margin-inline: 6px; font-size: 20px; }
+.dur { font-size: 14px; color: var(--ink-2); }
+.tl { width: 100%; height: auto; display: block; }
+.tl text { font-family: var(--font-num); font-size: 10px; fill: var(--ink-3); }
+.tl-track { fill: var(--surface-2); }
+.tl-band { fill: var(--band); }
+.tl-sleep { fill: var(--sleep); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font-size: 11.5px; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); white-space: nowrap; }
+.chip.ok { background: var(--good-soft); color: var(--good-ink); }
+
+.tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.task { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+.task:first-child { border-top: 0; padding-top: 2px; }
+.task b { font-weight: 700; font-size: 14.5px; line-height: 1.4; display: block; }
+.task small, .opt small { display: block; color: var(--ink-3); font-size: 12px; line-height: 1.5; font-weight: 400; }
+.mark { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; color: transparent; flex: none; }
+.mark svg { display: block; }
+.task.done .mark { background: var(--good); border-color: var(--good); color: var(--on-good); }
+.sw-btn { appearance: none; border: 0; width: 46px; height: 28px; border-radius: 999px; background: var(--surface-2); position: relative; cursor: pointer; flex: none; }
+.sw-btn::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink-3); transition: transform .18s; }
+.sw-btn[aria-checked="true"] { background: var(--good); }
+.sw-btn[aria-checked="true"]::after { transform: translateX(18px); background: var(--on-good); }
+
+.contrib { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--asset-soft); }
+.contrib b { font-size: 14px; display: block; color: var(--asset-ink); }
+.contrib small { font-size: 12px; color: var(--asset-ink); opacity: .9; }
+.contrib .amt { font-family: var(--font-num); font-size: 26px; color: var(--asset-ink); font-variant-numeric: tabular-nums; }
+.weekrow { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.dots { display: flex; gap: 5px; }
+.dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); display: block; }
+.dot.on { background: var(--sleep); border-color: var(--sleep); }
+.dot.future { opacity: .35; }
+
+.btn { appearance: none; border: 0; background: var(--sleep); color: var(--on-sleep); font-weight: 700; padding: 10px 16px; border-radius: 12px; cursor: pointer; }
+.btn.sm { padding: 7px 12px; font-size: 13px; border-radius: 10px; }
+.btn.big { padding: 12px 24px; font-size: 17px; border-radius: 14px; min-width: 112px; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+.btn.solid { background: var(--ink); color: var(--bg); }
+.btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.cta { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.cta b { display: block; }
+.cta small { color: var(--ink-3); font-size: 12px; }
+.steps { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+
+input[type="time"], input[type="date"] { font: inherit; font-family: var(--font-num); font-size: 15px; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 10px; padding: 8px 10px; min-height: 42px; width: 100%; min-width: 0; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.fields label, .editrow label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-3); min-width: 0; }
+.editform { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; border-top: 1px solid var(--line); }
+.editrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.opt { appearance: none; width: 100%; text-align: left; display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--surface); cursor: pointer; }
+.opt b { font-size: 14.5px; font-weight: 700; line-height: 1.4; display: block; }
+.opt.on { border-color: var(--sleep); background: var(--surface-2); }
+.opt.on .mark { background: var(--sleep); border-color: var(--sleep); color: var(--on-sleep); }
+.opt .radio { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); margin-top: 2px; }
+.opt.on .radio { border: 7px solid var(--sleep); }
+.opt[disabled] { cursor: default; opacity: .7; }
+.optlist { display: flex; flex-direction: column; gap: 8px; }
+.alloc { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; margin: 6px 0 4px; }
+.alloc i { display: block; height: 100%; }
+.alloc .e { background: var(--asset); }
+.alloc .b { background: var(--asset-soft); }
+.alloc .c { background: var(--line); }
+
+.rv { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.hb { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: baseline; font-size: 13px; }
+.hb .track { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.hb .track i { display: block; height: 100%; border-radius: 4px; }
+.hb .track i.s { background: var(--sleep); }
+.hb .track i.a { background: var(--asset); }
+.hb .track i.n { background: var(--ink-3); }
+.hb b { font-family: var(--font-num); font-weight: 500; font-variant-numeric: tabular-nums; }
+.hb small { color: var(--ink-3); font-size: 11.5px; margin-left: 6px; }
+.bignum { display: flex; align-items: baseline; gap: 6px 10px; flex-wrap: wrap; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.bignum .a { font-size: 15px; color: var(--ink-2); }
+.bignum .b { font-size: 26px; color: var(--asset-ink); }
+.bignum .c { font-size: 13px; color: var(--ink-2); }
+.say { font-size: 14px; margin: 0; line-height: 1.7; }
+
+.week { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line); }
+.week:first-of-type { border-top: 0; padding-top: 0; }
+.week-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.week-head b { font-size: 14px; }
+.week-head small { color: var(--ink-3); font-size: 12px; margin-left: 6px; }
+.week-sub { font-size: 12px; color: var(--ink-2); margin: 0; }
+
+.dock { position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); width: min(100%, 420px); padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--surface); border: 1px solid var(--line); border-bottom: 0; border-radius: 18px 18px 0 0; display: flex; z-index: 5; box-shadow: 0 -4px 16px rgba(22, 26, 56, .08); }
+#dockDemo, #dockMine { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.play { appearance: none; border: 0; width: 46px; height: 46px; border-radius: 50%; background: var(--sleep); color: var(--on-sleep); display: grid; place-items: center; cursor: pointer; flex: none; }
+.play svg { fill: currentColor; display: block; }
+.dock-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dock-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.dayno { font-family: var(--font-num); font-size: 14px; font-variant-numeric: tabular-nums; }
+#dayRange { width: 100%; margin: 0; height: 24px; accent-color: var(--sleep); }
+.mine-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0; }
+.mine-info b { font-size: 15px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .chart .bar.cur { animation: none; }
+  .sw-btn::after { transition: none; }
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg class="moon" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <div>
+        <div class="logo">ねかせ</div>
+        <div class="tag">眠る習慣が、仮想の資産を育てる</div>
+      </div>
+    </div>
+    <span class="pill">実際の取引なし</span>
+  </header>
+  <nav class="tabs" role="tablist" aria-label="画面の切り替え">
+    <button class="tab" role="tab" data-act="tab" data-key="home" id="tab-home">ホーム</button>
+    <button class="tab" role="tab" data-act="tab" data-key="setup" id="tab-setup">設定</button>
+    <button class="tab" role="tab" data-act="tab" data-key="review" id="tab-review">振り返り</button>
+  </nav>
+  <main id="main"></main>
+</div>
+
+<div class="dock">
+  <div id="dockDemo">
+    <button class="play" id="play" data-act="play" aria-label="1か月を早送り"></button>
+    <div class="dock-body">
+      <div class="dock-top"><span class="note" id="dockNote">デモ操作 · ▶で1か月を早送り</span><span class="dayno" id="dayno"></span></div>
+      <input id="dayRange" type="range" min="1" max="30" step="1" value="12" aria-label="日付を動かす">
+    </div>
+  </div>
+  <div id="dockMine" hidden>
+    <div class="mine-info"><span class="note" id="mineNote" aria-live="polite"></span><b id="mineState"></b></div>
+    <button class="btn ghost sm" id="mineCancel" data-act="bed-cancel" hidden>取り消し</button>
+    <button class="btn big" id="mineBtn" data-act="bed-now">ねる</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---- 定数 ---- */
+  var OFF = 1200;   /* 横軸(時刻)は 20:00 から */
+  var SPAN = 960;   /* 12:00 までの960分 */
+  var TICKS = [120, 240, 360, 480, 600, 720, 840]; /* 22:00 〜 10:00 を2時間おき */
+  var TOL = 30;
+  var BASE = 3000;  /* 1日の基準積立(仮想円) */
+  var CHECK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function ax(t) { var p = t.split(':'), v = (+p[0]) * 60 + (+p[1]); if (v < OFF) v += 1440; return v - OFF; }
+  function clock(a) { var v = (a + OFF) % 1440, h = Math.floor(v / 60); return pad(h) + ':' + pad(v % 60); }
+  function yen(n) { return '¥' + Math.round(n).toLocaleString('en-US'); }
+  function sgn(n, d) { return (n >= 0 ? '+' : '−') + Math.abs(n).toFixed(d == null ? 1 : d) + '%'; }
+  function man(v) { return v === 0 ? '0' : v >= 10000 ? String(+(v / 10000).toFixed(1)) + '万' : v.toLocaleString('en-US'); }
+  function clamp(v) { return Math.max(0, Math.min(SPAN, v)); }
+
+  /* ---- 日付 ---- */
+  function dkey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function parseKey(k) { var p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function addDays(k, n) { var d = parseKey(k); d.setDate(d.getDate() + n); return dkey(d); }
+  function daysBetween(a, b) { return Math.round((parseKey(b).getTime() - parseKey(a).getTime()) / 86400000); }
+  function hhmm(d) { return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function todayKey() { return dkey(new Date()); }
+
+  /* ---- サンプルデータ(30日分): 就寝, 起床, 画面を閉じた, カフェインを控えた ---- */
+  var D = [
+    ['01:10', '07:05', 0, 0], ['00:35', '06:50', 0, 1], ['01:50', '07:10', 0, 0], ['01:05', '06:55', 1, 0], ['02:10', '07:20', 0, 0], ['02:25', '09:35', 0, 0], ['01:40', '09:05', 0, 1],
+    ['00:55', '06:50', 1, 1], ['00:40', '06:40', 0, 1], ['00:20', '06:35', 1, 0], ['00:10', '06:30', 1, 1], ['23:55', '06:25', 1, 1], ['00:25', '08:00', 0, 1], ['23:50', '07:15', 1, 1],
+    ['23:40', '06:30', 1, 1], ['23:35', '06:35', 1, 1], ['23:25', '06:30', 1, 0], ['23:30', '06:25', 0, 1], ['23:20', '06:30', 1, 1], ['23:45', '07:10', 1, 1], ['23:35', '07:00', 1, 1],
+    ['00:50', '06:40', 0, 1], ['01:30', '06:35', 0, 0], ['01:55', '06:30', 0, 0], ['01:15', '06:40', 0, 1], ['23:50', '06:35', 1, 1], ['23:35', '07:00', 1, 1], ['23:30', '06:55', 1, 1], ['23:25', '06:30', 1, 0], ['23:30', '06:30', 1, 1]
+  ].map(function (r) { return { bed: ax(r[0]), wake: ax(r[1]), screen: !!r[2], caffeine: !!r[3] }; });
+
+  /* 仮想の日次リターン(%)。途中に下落局面を1回含む学習用データ */
+  var R_EQ = [0.6, -0.3, 0.8, 0.4, -0.5, 0.9, 0.3, -0.8, -1.2, -0.6, 0.4, -2.1, -3.4, -2.8, -1.9, 1.1, -2.6, -1.4, 1.6, 2.9, 3.4, 2.1, 2.6, -0.7, 2.2, 1.5, 0.9, 1.8, -0.4, 1.3];
+  var R_BD = [0.05, 0.1, -0.05, 0.08, 0.05, 0.1, -0.02, 0.15, 0.2, 0.1, 0.05, 0.3, 0.35, 0.25, 0.2, -0.1, 0.3, 0.15, 0, -0.1, -0.2, -0.05, -0.15, 0.1, -0.1, 0, 0.05, -0.05, 0.1, 0.05];
+  function series(r) { var p = [1]; r.forEach(function (x) { p.push(p[p.length - 1] * (1 + x / 100)); }); return p; }
+  var PX = { eq: series(R_EQ), bd: series(R_BD) };
+
+  var PRESETS = {
+    safe: { name: '守り重視', eq: 0.2, bd: 0.5, cash: 0.3 },
+    bal: { name: 'バランス', eq: 0.6, bd: 0.3, cash: 0.1 },
+    grow: { name: '成長重視', eq: 0.8, bd: 0.15, cash: 0.05 }
+  };
+  var TASKS = {
+    bed: { label: '就寝時刻を守る', auto: true, desc: function () { return '目標の' + clock(TARGET.bed) + 'から前後30分以内に眠る'; } },
+    wake: { label: '起床時刻をそろえる', auto: true, desc: function () { return '目標の' + clock(TARGET.wake) + 'から前後30分以内に起きる'; } },
+    screen: { label: '寝る1時間前に画面を閉じる', auto: false, desc: function () { return 'スマホやPCを見ない'; } },
+    caffeine: { label: '夕方以降はカフェインを控える', auto: false, desc: function () { return 'コーヒー、緑茶、エナジードリンクなど'; } }
+  };
+
+  /* ---- 状態 ---- */
+  var TARGET = { bed: ax('23:30'), wake: ax('06:30') };
+  var S = { mode: 'demo', day: 12, tab: 'home', tasks: ['bed', 'screen', 'caffeine'], preset: 'bal', manual: {}, playing: false, hint: '', msg: '', editing: false, formMsg: '', confirmReset: false, storage: true };
+  var MINE = { start: null, records: {}, pending: null, tbed: '23:30', twake: '06:30' };
+  var KEY = 'nekase.v1';
+
+  function applyTarget() {
+    if (S.mode === 'demo') { TARGET.bed = ax('23:30'); TARGET.wake = ax('06:30'); }
+    else { TARGET.bed = ax(MINE.tbed); TARGET.wake = ax(MINE.twake); }
+  }
+  function load() {
+    try {
+      var raw = window.localStorage.getItem(KEY);
+      if (!raw) return;
+      var o = JSON.parse(raw);
+      if (o.mine) {
+        MINE.start = o.mine.start || null; MINE.records = o.mine.records || {}; MINE.pending = o.mine.pending || null;
+        MINE.tbed = o.mine.tbed || '23:30'; MINE.twake = o.mine.twake || '06:30';
+      }
+      if (o.tasks && o.tasks.length >= 2 && o.tasks.length <= 3) {
+        var t = o.tasks.filter(function (k) { return TASKS[k]; });
+        if (t.length >= 2) S.tasks = t;
+      }
+      if (o.preset && PRESETS[o.preset]) S.preset = o.preset;
+      if (o.mode === 'mine') S.mode = 'mine';
+    } catch (e) { S.storage = false; }
+  }
+  function save() {
+    try { window.localStorage.setItem(KEY, JSON.stringify({ mine: MINE, tasks: S.tasks, preset: S.preset, mode: S.mode })); }
+    catch (e) { S.storage = false; }
+  }
+
+  /* ---- 記録(デモ/自分) ---- */
+  function mineToday() { return MINE.start ? Math.max(0, Math.min(29, daysBetween(MINE.start, todayKey()))) : -1; }
+  function isEnded() { return S.mode === 'mine' && !!MINE.start && daysBetween(MINE.start, todayKey()) > 29; }
+  function maxDay() { return S.mode === 'demo' ? 30 : Math.max(1, mineToday() + 1); }
+  function keyOf(i) { return addDays(MINE.start, i); }
+  function rec(i) {
+    if (S.mode === 'demo') return D[i] || null;
+    if (!MINE.start || i < 0 || i > mineToday()) return null;
+    return MINE.records[keyOf(i)] || { bed: null, wake: null, screen: false, caffeine: false };
+  }
+  function ensureStart() { if (!MINE.start) MINE.start = todayKey(); }
+  function ensureRec(i) {
+    ensureStart();
+    var k = keyOf(i);
+    if (!MINE.records[k]) MINE.records[k] = { bed: null, wake: null, screen: false, caffeine: false };
+    return MINE.records[k];
+  }
+  function flag(i, k) {
+    var r = rec(i);
+    if (!r) return false;
+    if (S.mode === 'demo') { var m = S.manual[i]; return m && k in m ? m[k] : r[k]; }
+    return !!r[k];
+  }
+  function setFlag(i, k, v) {
+    if (S.mode === 'demo') { if (!S.manual[i]) S.manual[i] = {}; S.manual[i][k] = v; }
+    else { ensureRec(i)[k] = v; save(); }
+  }
+  function dateLabel(i) {
+    if (S.mode !== 'mine' || !MINE.start) return '';
+    var d = parseKey(keyOf(i));
+    return ' · ' + (d.getMonth() + 1) + '/' + d.getDate();
+  }
+
+  /* ---- 計算 ---- */
+  function done(i, k) {
+    var r = rec(i);
+    if (!r) return false;
+    if (k === 'bed') return r.bed != null && Math.abs(r.bed - TARGET.bed) <= TOL;
+    if (k === 'wake') return r.wake != null && Math.abs(r.wake - TARGET.wake) <= TOL;
+    return flag(i, k);
+  }
+  function dayStat(i) {
+    var k = S.tasks.length, n = 0;
+    S.tasks.forEach(function (t) { if (done(i, t)) n++; });
+    var rate = n / k;
+    return { n: n, k: k, rate: rate, clear: n > k / 2, contrib: Math.round(BASE * rate / 100) * 100 };
+  }
+  /* 毎日の損益を、積立元本にかかった分(A)と、それまでの損益にかかった分(B)に分ける。B が複利の分 */
+  function simulate() {
+    var w = PRESETS[S.preset], u = { eq: 0, bd: 0, cash: 0 }, principal = 0, A = 0, B = 0, prevG = 0, out = [];
+    for (var i = 0; i < 30; i++) {
+      var st = dayStat(i), c = st.contrib;
+      principal += c;
+      u.eq += c * w.eq / PX.eq[i];
+      u.bd += c * w.bd / PX.bd[i];
+      u.cash += c * w.cash;
+      var before = u.eq * PX.eq[i] + u.bd * PX.bd[i] + u.cash;
+      var after = u.eq * PX.eq[i + 1] + u.bd * PX.bd[i + 1] + u.cash;
+      if (before > 0) {
+        var gain = after - before;
+        A += gain * principal / before;
+        B += gain * prevG / before;
+      }
+      var G = after - principal;
+      prevG = G;
+      var comp = G > 0 ? Math.max(0, Math.min(B, G)) : 0;
+      out.push({ c: c, principal: principal, value: after, st: st, G: G, comp: comp, g1: G > 0 ? G - comp : 0, loss: G < 0 ? -G : 0 });
+    }
+    return out;
+  }
+  /* 就寝時刻の、目標からのズレの平均(記録が3日未満なら null) */
+  function madRange(a, b) {
+    var s = 0, n = 0;
+    for (var j = a; j <= b; j++) { var r = rec(j); if (r && r.bed != null) { s += Math.abs(r.bed - TARGET.bed); n++; } }
+    return n >= 3 ? s / n : null;
+  }
+  function reveal(sim) {
+    var w = PRESETS[S.preset], runPeak = 1, runDay = 0, maxDD = 0, peakDay = 0, troughDay = 0;
+    for (var k = 1; k <= 30; k++) {
+      var p = PX.eq[k];
+      if (p > runPeak) { runPeak = p; runDay = k; }
+      var dd = p / runPeak - 1;
+      if (dd < maxDD) { maxDD = dd; troughDay = k; peakDay = runDay; }
+    }
+    var groups = [
+      { n: '下落の前', a: 1, b: peakDay },
+      { n: '下落の最中', a: peakDay + 1, b: troughDay },
+      { n: '回復のあと', a: troughDay + 1, b: 30 }
+    ];
+    groups.forEach(function (g) {
+      var cost = 0, val = 0, days = 0;
+      for (var k = g.a; k <= g.b; k++) {
+        var c = sim[k - 1].c;
+        if (!c) continue;
+        cost += c; days++;
+        val += c * (w.eq * PX.eq[30] / PX.eq[k - 1] + w.bd * PX.bd[30] / PX.bd[k - 1] + w.cash);
+      }
+      g.cost = cost; g.days = days; g.ret = cost ? val / cost - 1 : null;
+    });
+    return { maxDD: maxDD, peakDay: peakDay, troughDay: troughDay, groups: groups };
+  }
+
+  /* ---- 図 ---- */
+  var W = 360, L = 40, PW = 312, Y0 = 20, H1 = 168, Y2 = 228, H2 = 96;
+  function xo(d) { return L + (d - 0.5) / 30 * PW; }
+  function ys(m) { return Y0 + m / SPAN * H1; }
+  function niceTop(v) {
+    var steps = [10000, 20000, 25000, 50000, 100000, 200000];
+    for (var i = 0; i < steps.length; i++) { var n = Math.ceil(v / steps[i]); if (n <= 4) return { top: n * steps[i], step: steps[i] }; }
+    return { top: Math.ceil(v / 200000) * 200000, step: 200000 };
+  }
+  function f1(n) { return n.toFixed(1); }
+
+  function chartSVG(sim) {
+    var maxV = 1000;
+    sim.forEach(function (s) { maxV = Math.max(maxV, s.value, s.principal); });
+    var nt = niceTop(maxV * 1.04), top = nt.top;
+    function ya(v) { return Y2 + H2 - (v / top) * H2; }
+    var s = '<svg id="chart" class="chart" viewBox="0 0 ' + W + ' 372" role="img" aria-label="' + S.day + '日目までの、就寝と起床の棒グラフ(上)と、仮想の評価額の内訳(積立元本・運用益・複利の分)の推移(下)">';
+    s += '<defs><pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" style="stroke:var(--ink-3);stroke-width:1.3"/></pattern></defs>';
+    s += '<text class="cap" x="' + L + '" y="12">睡眠(就寝 → 起床)</text>';
+    [TARGET.bed, TARGET.wake].forEach(function (t) {
+      s += '<rect class="band" x="' + L + '" y="' + f1(ys(clamp(t - TOL))) + '" width="' + PW + '" height="' + f1(ys(clamp(t + TOL)) - ys(clamp(t - TOL))) + '"/>';
+    });
+    TICKS.forEach(function (t) {
+      s += '<line class="grid" x1="' + L + '" x2="' + (L + PW) + '" y1="' + f1(ys(t)) + '" y2="' + f1(ys(t)) + '"/>';
+      s += '<text x="' + (L - 6) + '" y="' + f1(ys(t) + 3.5) + '" text-anchor="end">' + clock(t) + '</text>';
+    });
+    [7, 14, 21, 28].forEach(function (d) {
+      var x = L + d / 30 * PW;
+      s += '<line class="wk" x1="' + f1(x) + '" x2="' + f1(x) + '" y1="' + Y0 + '" y2="' + (Y2 + H2) + '"/>';
+    });
+    s += '<text class="cap" x="' + L + '" y="' + (Y2 - 10) + '">仮想の資産(円)</text>';
+    for (var v = 0; v <= top; v += nt.step) {
+      s += '<line class="grid" x1="' + L + '" x2="' + (L + PW) + '" y1="' + f1(ya(v)) + '" y2="' + f1(ya(v)) + '"/>';
+      s += '<text x="' + (L - 6) + '" y="' + f1(ya(v) + 3.5) + '" text-anchor="end">' + man(v) + '</text>';
+    }
+    if (S.day >= 30) {
+      var rv = reveal(sim);
+      var bx = L + rv.peakDay / 30 * PW, bw = (rv.troughDay - rv.peakDay) / 30 * PW;
+      s += '<rect class="dip" x="' + f1(bx) + '" y="' + (Y2 - 4) + '" width="' + f1(bw) + '" height="' + (H2 + 4) + '"/>';
+      s += '<text class="dip-t" x="' + f1(bx + bw / 2) + '" y="' + (Y2 + 9) + '" text-anchor="middle">下落局面</text>';
+    }
+    /* 睡眠の棒 */
+    for (var i = 0; i < S.day; i++) {
+      var d = rec(i);
+      if (!d || d.bed == null || d.wake == null) continue;
+      var kept = Math.abs(d.bed - TARGET.bed) <= TOL;
+      s += '<rect class="bar' + (kept ? '' : ' off') + (i === S.day - 1 ? ' cur' : '') + '" x="' + f1(xo(i + 1) - 3.2) + '" y="' + f1(ys(clamp(d.bed))) + '" width="6.4" height="' + f1(Math.max(2, ys(clamp(d.wake)) - ys(clamp(d.bed)))) + '" rx="3.2"/>';
+    }
+    /* 資産の内訳(積み上げ): 元本 / 運用益 / 複利の分 / 元本割れ */
+    var pts = sim.slice(0, S.day);
+    function band(hi, lo) {
+      var up = pts.map(function (q, k) { return (k ? 'L' : 'M') + f1(xo(k + 1)) + ' ' + f1(ya(hi(q))); }).join(' ');
+      var down = pts.map(function (q, k) { var j = pts.length - 1 - k; return 'L' + f1(xo(j + 1)) + ' ' + f1(ya(lo(pts[j]))); }).join(' ');
+      return up + ' ' + down + ' Z';
+    }
+    function t0(q) { return Math.min(q.value, q.principal); }
+    function t1(q) { return t0(q) + q.g1; }
+    function t2(q) { return t1(q) + q.comp; }
+    function tl(q) { return t0(q) + q.loss; }
+    s += '<path class="l1" d="' + band(t0, function () { return 0; }) + '"/>';
+    s += '<path class="l2" d="' + band(t1, t0) + '"/>';
+    s += '<path class="l3" d="' + band(t2, t1) + '"/>';
+    s += '<path class="loss" d="' + band(tl, t0) + '"/>';
+    var lv = pts.map(function (p, k) { return (k ? 'L' : 'M') + f1(xo(k + 1)) + ' ' + f1(ya(p.value)); }).join(' ');
+    s += '<path class="total" d="' + lv + '"/>';
+    /* 日付カーソル */
+    var cx = xo(S.day), cur = pts[pts.length - 1];
+    s += '<line class="cursor" x1="' + f1(cx) + '" x2="' + f1(cx) + '" y1="' + Y0 + '" y2="' + (Y2 + H2) + '"/>';
+    s += '<circle class="dot-end" cx="' + f1(cx) + '" cy="' + f1(ya(cur.value)) + '" r="4.5"/>';
+    [1, 7, 14, 21, 28].forEach(function (d) {
+      s += '<text x="' + f1(xo(d)) + '" y="342" text-anchor="middle">' + d + '</text>';
+    });
+    var px = Math.min(318, Math.max(2, cx - 20));
+    s += '<rect class="mk" x="' + f1(px) + '" y="350" width="40" height="16" rx="8"/>';
+    s += '<text class="mk-t" x="' + f1(px + 20) + '" y="361.5" text-anchor="middle">' + S.day + '日目</text>';
+    return s + '</svg>';
+  }
+
+  function timelineSVG(d) {
+    var has = d && d.bed != null && d.wake != null;
+    var Wt = 340, Lt = 8, pw = Wt - 16;
+    function f(m) { return Lt + clamp(m) / SPAN * pw; }
+    var s = '<svg class="tl" viewBox="0 0 ' + Wt + ' 58" role="img" aria-label="' + (has ? '昨夜の就寝 ' + clock(d.bed) + ' から起床 ' + clock(d.wake) : '昨夜の睡眠は記録されていません') + '">';
+    s += '<rect class="tl-track" x="' + Lt + '" y="9" width="' + pw + '" height="22" rx="11"/>';
+    [TARGET.bed, TARGET.wake].forEach(function (t) {
+      s += '<rect class="tl-band" x="' + f1(f(t - TOL)) + '" y="3" width="' + f1(f(t + TOL) - f(t - TOL)) + '" height="34" rx="6"/>';
+    });
+    if (has) s += '<rect class="tl-sleep" x="' + f1(f(d.bed)) + '" y="10" width="' + f1(Math.max(6, f(d.wake) - f(d.bed))) + '" height="20" rx="10"/>';
+    TICKS.forEach(function (t) {
+      s += '<text x="' + f1(f(t)) + '" y="53" text-anchor="middle">' + clock(t) + '</text>';
+    });
+    return s + '</svg>';
+  }
+
+  /* ---- 画面の部品 ---- */
+  function devChip(label, delta) {
+    var a = Math.abs(delta), ok = a <= TOL;
+    var txt = a <= 2 ? '目標どおり' : delta > 0 ? '目標より' + a + '分遅め' : '目標より' + a + '分早め';
+    return '<span class="chip' + (ok ? ' ok' : '') + '">' + label + ' ' + txt + '</span>';
+  }
+
+  function weekDots(sim, a, b) {
+    var dots = '', cl = 0;
+    for (var j = a; j < a + 7; j++) {
+      if (j > b) { dots += '<i class="dot future"></i>'; continue; }
+      var c = sim[j].st.clear;
+      if (c) cl++;
+      dots += '<i class="dot' + (c ? ' on' : '') + '"></i>';
+    }
+    return { dots: dots, clear: cl };
+  }
+
+  function sleepForm(d) {
+    var bedV = d && d.bed != null ? clock(d.bed) : clock(TARGET.bed);
+    var wakeV = d && d.wake != null ? clock(d.wake) : clock(TARGET.wake);
+    return '<form class="editform" id="sleepForm">' +
+      '<div class="editrow"><label>就寝<input type="time" id="inBed" value="' + bedV + '" data-fid="inBed"></label><label>起床<input type="time" id="inWake" value="' + wakeV + '" data-fid="inWake"></label></div>' +
+      (S.formMsg ? '<p class="note" role="status">' + S.formMsg + '</p>' : '') +
+      '<div class="btnrow"><button type="submit" class="btn sm" data-fid="saveSleep">保存</button><button type="button" class="btn sm ghost" data-act="edit-close" data-fid="editClose">閉じる</button></div></form>';
+  }
+
+  function nightCard(i) {
+    var d = rec(i), has = d && d.bed != null && d.wake != null, demo = S.mode === 'demo';
+    var h = '<section class="card"><div class="card-head"><h2>昨夜の睡眠</h2><span class="note">' + (demo ? 'デモデータ · 推定値' : '自分の記録' + dateLabel(i)) + '</span></div>';
+    if (has) {
+      var dur = d.wake - d.bed, hh = Math.floor(dur / 60), mm = dur % 60;
+      h += '<div class="night"><span class="range">' + clock(d.bed) + '<i>→</i>' + clock(d.wake) + '</span><span class="dur">' + hh + '時間' + mm + '分</span></div>';
+      h += timelineSVG(d);
+      h += '<div class="chips">' + devChip('就寝', d.bed - TARGET.bed) + devChip('起床', d.wake - TARGET.wake) + '</div>';
+    } else {
+      h += timelineSVG(null);
+      h += '<p class="note">' + (MINE.start || demo ? 'この日の睡眠は、まだ記録されていません。朝に「おきた」を押すか、時刻を入力してください。' : 'まだ記録がありません。') + '</p>';
+    }
+    if (!demo) {
+      h += S.editing ? sleepForm(d) : '<div class="btnrow"><button class="btn sm ghost" data-act="edit-open" data-fid="editOpen">時刻を入力・修正</button></div>';
+    }
+    return h + '</section>';
+  }
+
+  function taskCard(i, sim) {
+    var d = rec(i), st = sim[i].st;
+    var rows = S.tasks.map(function (k) {
+      var T = TASKS[k], ok = done(i, k), sub, right;
+      if (T.auto) {
+        var v = d ? (k === 'bed' ? d.bed : d.wake) : null;
+        sub = v == null ? '自動判定 · 記録がありません' : '自動判定 · ' + (k === 'bed' ? '就寝 ' : '起床 ') + clock(v) + (ok ? '' : ' · 目標の±30分の外');
+        right = '<span class="chip">自動</span>';
+      } else {
+        sub = '自己申告 · ' + T.desc();
+        right = '<button class="sw-btn" role="switch" aria-checked="' + ok + '" aria-label="' + T.label + '" data-act="flag" data-key="' + k + '" data-fid="flag-' + k + '"></button>';
+      }
+      return '<li class="task' + (ok ? ' done' : '') + '"><span class="mark" aria-hidden="true">' + CHECK + '</span><div><b>' + T.label + '</b><small>' + sub + '</small></div>' + right + '</li>';
+    }).join('');
+    var wk = Math.floor(i / 7), wd = weekDots(sim, wk * 7, i);
+    return '<section class="card"><div class="card-head"><h2>昨夜の行動課題</h2><span class="note">達成 ' + st.n + ' / ' + st.k + '</span></div>' +
+      '<ul class="tasks">' + rows + '</ul>' +
+      '<div class="contrib"><div><b>きょうの積立</b><small>達成率 × 基準 ' + yen(BASE) + '</small></div><div class="amt">' + yen(st.contrib) + '</div></div>' +
+      (st.contrib === 0 ? '<p class="note">お休みの日は、積立が止まるだけです。積立済みの分は、そのまま育ち続けます。</p>' : '') +
+      '<div class="weekrow"><div class="dots" aria-hidden="true">' + wd.dots + '</div><span class="note">' + (wk + 1) + '週目 · クリア ' + wd.clear + '日(週5日できればOK)</span></div></section>';
+  }
+
+  function legendHTML(sim) {
+    var anyLoss = sim.slice(0, S.day).some(function (q) { return q.loss > 0; });
+    return '<ul class="legend"><li><i class="sw bar"></i>就寝 → 起床</li><li><i class="sw faint"></i>就寝が帯の外</li><li><i class="sw band"></i>目標の±30分(就寝 ' + clock(TARGET.bed) + ' / 起床 ' + clock(TARGET.wake) + ')</li></ul>' +
+      '<ul class="legend"><li><i class="sw l1"></i>積立元本</li><li><i class="sw l2"></i>運用益</li><li><i class="sw l3"></i>複利の分</li>' +
+      (anyLoss ? '<li><i class="sw loss"></i>元本割れ</li>' : '') + '<li><i class="sw line"></i>評価額(合計)</li></ul>';
+  }
+
+  function breakdownCard(cur) {
+    var p = cur.principal, v = cur.value, T = Math.max(p, v, 1);
+    var segs = [['l1', Math.min(v, p)], ['l2', cur.g1], ['l3', cur.comp], ['loss', cur.loss]];
+    var bar = segs.map(function (s) { return s[1] > 0 ? '<i class="' + s[0] + '" style="width:' + (s[1] / T * 100).toFixed(2) + '%"></i>' : ''; }).join('');
+    function row(cls, name, sub, amt) { return '<li><i class="sw ' + cls + '"></i><span>' + name + '<small>' + sub + '</small></span><b>' + amt + '</b></li>'; }
+    var rows = '', note;
+    if (p === 0) {
+      note = '積立が始まると、ここに内訳が出ます。';
+    } else {
+      rows = row('l1', '積立元本', '自分で積み立てた仮想のお金', yen(p));
+      if (cur.G > 0) {
+        rows += row('l2', '運用益', '積立元本が生んだ分', '+' + yen(cur.g1));
+        rows += row('l3', '複利の分', '運用益がさらに運用されて生んだ分', '+' + yen(cur.comp));
+        note = '運用益のうち ' + Math.round(cur.comp / cur.G * 100) + '% が、増えた分がさらに運用されて生んだ複利の分です。' +
+          (cur.comp / Math.max(v, 1) < 0.01 ? '期間が短いため、まだ小さな値です。長く続けるほど大きくなります。' : '');
+      } else if (cur.loss > 0) {
+        rows += row('loss', '元本割れ', '値下がりで、一時的に下回っている分', '−' + yen(cur.loss));
+        note = '値下がりで元本を下回る時期は、積立を続けている間にも起こります。';
+      } else {
+        note = '運用益は、まだありません。';
+      }
+      rows += '<li class="total"><i class="sw ghost"></i><span>評価額</span><b>' + yen(v) + '</b></li>';
+    }
+    return '<section class="card"><div class="card-head"><h2>評価額の内訳</h2><span class="note">' + S.day + '日目の時点</span></div>' +
+      '<div class="bkbar" role="img" aria-label="評価額の内訳の割合">' + bar + '</div>' +
+      (rows ? '<ul class="bk">' + rows + '</ul>' : '') + '<p class="note">' + note + '</p></section>';
+  }
+
+  function homeView(sim) {
+    var i = S.day - 1, cur = sim[i];
+    var m7 = madRange(Math.max(0, i - 6), i), m1 = madRange(0, 6);
+    var gain = cur.principal > 0 ? sgn((cur.value / cur.principal - 1) * 100) : '—';
+    var demo = S.mode === 'demo', h = '';
+    if (demo) h += '<div class="banner"><span>デモデータを表示中です</span><button class="btn sm" data-act="mode" data-key="mine" data-fid="startMine">自分の記録を始める</button></div>';
+    if (!demo && !MINE.start) {
+      h += '<section class="card"><div class="card-head"><h2>はじめましょう</h2></div><ol class="steps"><li>設定で、目標の就寝・起床時刻を決めます(初期値は ' + clock(TARGET.bed) + ' / ' + clock(TARGET.wake) + ')。</li><li>寝る前に、画面下の「ねる」を押します。</li><li>朝に「おきた」を押します。押し忘れた日は、時刻を入力できます。</li></ol>' +
+        '<div class="btnrow"><button class="btn" data-act="tab" data-key="setup" data-fid="goSetup">目標の時刻を決める</button></div></section>';
+    }
+    if (isEnded()) h += '<section class="card cta"><div><b>30日のチャレンジが終わりました</b><small>答え合わせは振り返りで見られます。新しく始めるには、設定で記録をリセットします。</small></div><button class="btn" data-act="review" data-fid="cta">答え合わせを見る</button></section>';
+    else if (S.day >= 30) h += '<section class="card cta"><div><b>30日が終わりました</b><small>答え合わせで、睡眠と資産の変化を振り返れます。</small></div><button class="btn" data-act="review" data-fid="cta">答え合わせを見る</button></section>';
+    h += '<section class="card"><div class="card-head"><h2>睡眠のリズムと資産</h2><span class="note">' + S.day + '日目 / 30日' + dateLabel(i) + '</span></div>' +
+      '<div class="stats">' +
+      '<div class="stat sleep"><span class="k">就寝のズレ(直近7日の平均)</span><span class="v">' + (m7 != null ? Math.round(m7) : '—') + '<span class="u">分</span></span><span class="s">' + (m1 != null && S.day >= 7 ? '初週は' + Math.round(m1) + '分 · ' : '') + '小さいほど規則的</span></div>' +
+      '<div class="stat asset"><span class="k">仮想の評価額</span><span class="v">' + yen(cur.value) + '</span><span class="s">元本 ' + yen(cur.principal) + ' · ' + gain + '</span></div>' +
+      '</div>' + chartSVG(sim) + legendHTML(sim) +
+      '<p class="note">グラフをなぞると、日付が動きます。</p></section>';
+    h += breakdownCard(cur) + nightCard(i) + taskCard(i, sim);
+    return h;
+  }
+
+  function allocBar(p) {
+    return '<span class="alloc"><i class="e" style="width:' + Math.round(p.eq * 100) + '%"></i><i class="b" style="width:' + Math.round(p.bd * 100) + '%"></i><i class="c" style="width:' + Math.round(p.cash * 100) + '%"></i></span>';
+  }
+
+  function setupView() {
+    var demo = S.mode === 'demo';
+    function modeOpt(k, name, sub) {
+      var on = S.mode === k;
+      return '<button class="opt' + (on ? ' on' : '') + '" role="radio" aria-checked="' + on + '" data-act="mode" data-key="' + k + '" data-fid="m-' + k + '"><span class="radio" aria-hidden="true"></span><span><b>' + name + '</b><small>' + sub + '</small></span></button>';
+    }
+    var h = '<section class="card"><div class="card-head"><h2>記録のしかた</h2></div>' +
+      '<div class="optlist" role="radiogroup" aria-label="記録のしかた">' +
+      modeOpt('demo', 'デモデータ(30日分)', '内蔵のサンプルで、すべての機能を試せます') +
+      modeOpt('mine', '自分の記録', '「ねる」「おきた」ボタンで記録します。機器は要りません') + '</div>';
+    if (demo) {
+      h += '<p class="note">デモでは、目標は就寝 23:30 / 起床 06:30 に固定です。</p>';
+    } else {
+      h += '<div class="fields"><label>目標の就寝<input type="time" id="tgBed" value="' + MINE.tbed + '" data-fid="tgBed"></label>' +
+        '<label>目標の起床<input type="time" id="tgWake" value="' + MINE.twake + '" data-fid="tgWake"></label>' +
+        '<label>開始日<input type="date" id="startDate" value="' + (MINE.start || todayKey()) + '" max="' + todayKey() + '" data-fid="startDate"></label></div>' +
+        '<p class="note">記録は、このブラウザにだけ保存されます。サーバーには送りません。' + (S.storage ? '' : 'この環境では保存できないため、閉じると記録が消えます。') + '</p>';
+      h += S.confirmReset
+        ? '<div class="btnrow"><button class="btn sm solid" data-act="reset-do" data-fid="resetDo">記録をすべて削除する</button><button class="btn sm ghost" data-act="reset-cancel" data-fid="resetCancel">やめる</button></div>'
+        : '<div class="btnrow"><button class="btn sm ghost" data-act="reset-ask" data-fid="resetAsk">記録をリセット</button></div>';
+    }
+    h += '</section>';
+    var tk = Object.keys(TASKS).map(function (k) {
+      var on = S.tasks.indexOf(k) >= 0;
+      return '<button class="opt' + (on ? ' on' : '') + '" role="checkbox" aria-checked="' + on + '" data-act="task" data-key="' + k + '" data-fid="opt-' + k + '"><span class="mark" aria-hidden="true">' + CHECK + '</span><span><b>' + TASKS[k].label + '</b><small>' + (TASKS[k].auto ? '自動判定' : '自己申告') + ' · ' + TASKS[k].desc() + '</small></span></button>';
+    }).join('');
+    var pr = Object.keys(PRESETS).map(function (k) {
+      var p = PRESETS[k], on = S.preset === k;
+      return '<button class="opt' + (on ? ' on' : '') + '" role="radio" aria-checked="' + on + '" data-act="preset" data-key="' + k + '" data-fid="p-' + k + '"><span class="radio" aria-hidden="true"></span><span><b>' + p.name + '</b>' + allocBar(p) + '<small>世界株式 ' + Math.round(p.eq * 100) + '% · 債券 ' + Math.round(p.bd * 100) + '% · 現金 ' + Math.round(p.cash * 100) + '%</small></span></button>';
+    }).join('');
+    return h +
+      '<section class="card"><div class="card-head"><h2>行動課題</h2><span class="note">選択中 ' + S.tasks.length + ' / 3</span></div>' +
+      '<div class="optlist" role="group" aria-label="行動課題">' + tk + '</div>' +
+      '<p class="note" role="status">' + (S.hint || '2〜3個を選びます。多いと続かないため、最大3つです。時刻は、目標の前後30分で達成になります。') + '</p></section>' +
+      '<section class="card"><div class="card-head"><h2>仮想積立の配分</h2><span class="note">毎日、自動で積立</span></div>' +
+      '<div class="optlist" role="radiogroup" aria-label="配分">' + pr + '</div>' +
+      '<p class="note">学習用の仮想ファンドです。値動きは、下落を1回含むように作った仮想データです。</p></section>' +
+      '<section class="card"><div class="card-head"><h2>自動の取り込み(任意)</h2></div><div class="optlist">' +
+      '<button class="opt" role="radio" aria-checked="false" disabled><span class="radio" aria-hidden="true"></span><span><b>iPhone のヘルスケア / Apple Watch</b><small>アプリ版で対応予定</small></span></button>' +
+      '<button class="opt" role="radio" aria-checked="false" disabled><span class="radio" aria-hidden="true"></span><span><b>Fitbit</b><small>準備中</small></span></button></div>' +
+      '<p class="note">ボタンでの記録だけで、すべての機能を使えます。機器を持っている人は、自動の取り込みを足せるようにします。</p></section>';
+  }
+
+  function hb(label, small, ratio, txt, cls) {
+    return '<div class="hb"><span>' + label + (small ? '<small>' + small + '</small>' : '') + '</span><b>' + txt + '</b><span class="track"><i class="' + cls + '" style="width:' + Math.max(2, Math.min(100, ratio * 100)).toFixed(0) + '%"></i></span></div>';
+  }
+
+  function revealCard(sim) {
+    var rv = reveal(sim), last = sim[29];
+    var m1 = madRange(0, 6), m7 = madRange(23, 29), mx = Math.max(m1 || 0, m7 || 0, 1);
+    var gain = last.principal > 0 ? sgn((last.value / last.principal - 1) * 100) : '—';
+    var gmax = 0.0001, best = null;
+    rv.groups.forEach(function (g) { if (g.ret != null) { gmax = Math.max(gmax, Math.abs(g.ret)); if (!best || g.ret > best.ret) best = g; } });
+    var gbars = rv.groups.map(function (g) {
+      var rng = g.a <= g.b ? g.a + '〜' + g.b + '日目' : '';
+      if (g.ret == null) return hb(g.n, rng + ' · 積立なし', 0, '—', 'n');
+      return hb(g.n, rng + ' · 積立 ' + yen(g.cost), Math.abs(g.ret) / gmax, sgn(g.ret * 100), g.ret >= 0 ? 'a' : 'n');
+    }).join('');
+    var say = best && best === rv.groups[1]
+      ? '下がっている間に積み立てた分が、いちばん大きく増えました。値下がりの最中も続けると、安く買えた分があとから効いてきます。'
+      : '積立した時期によって、増え方は変わります。続けると、買う時期が自然にばらけます。';
+    var sleepSay = m1 != null && m7 != null && m7 < m1 ? '途中で乱れた日があっても、戻れば数字は小さくなります。' : '記録した日の就寝時刻を、目標と比べた平均です。';
+    return '<section class="card"><div class="card-head"><h2>答え合わせ</h2><span class="note">30日間のまとめ</span></div>' +
+      '<div class="rv"><h3>睡眠: 就寝のズレ</h3>' + hb('初週', '', (m1 || 0) / mx, m1 != null ? Math.round(m1) + '分' : '—', 's') + hb('直近7日', '', (m7 || 0) / mx, m7 != null ? Math.round(m7) + '分' : '—', 's') +
+      '<p class="say">' + sleepSay + '</p></div>' +
+      '<div class="rv"><h3>資産: 積立元本と評価額</h3><div class="bignum"><span class="a">' + yen(last.principal) + '</span><span class="a">→</span><span class="b">' + yen(last.value) + '</span><span class="c">' + gain + '</span></div>' +
+      (last.G > 0 ? '<p class="say">うち、増えた分がさらに運用されて生んだ複利の分は ' + yen(last.comp) + ' です。</p>' : '') + '</div>' +
+      '<div class="rv"><h3>値下がりの最中も続けた結果</h3><p class="say">仮想の世界株式は、' + (rv.peakDay + 1) + '〜' + rv.troughDay + '日目に ' + sgn(rv.maxDD * 100) + ' 下がりました。積立した時期ごとの、30日目の増減です。</p>' + gbars +
+      '<p class="say">' + say + '</p></div>' +
+      '<p class="note">結果を知ってから分かることで、同じ展開になる保証はありません。値動きは実在の相場ではなく、学習用に作った仮想データです。</p></section>';
+  }
+
+  function lockedCard() {
+    return '<section class="card cta"><div><b>答え合わせは30日目に開きます</b><small>いま ' + S.day + '日目です。</small></div>' +
+      (S.mode === 'demo' ? '<button class="btn" data-act="goto30" data-fid="goto30">30日目へ進む</button>' : '') + '</section>';
+  }
+
+  function weeksCard(sim) {
+    var rows = [];
+    for (var w = 0; w * 7 < S.day; w++) {
+      var a = w * 7, b = Math.min(a + 6, S.day - 1), wd = weekDots(sim, a, b);
+      var partial = b < a + 6, mv = madRange(a, b);
+      rows.push('<div class="week"><div class="week-head"><span><b>' + (w + 1) + '週目</b><small>' + (a + 1) + '〜' + (b + 1) + '日目' + (partial ? ' · 途中' : '') + '</small></span>' +
+        (wd.clear >= 5 ? '<span class="chip ok">週5日 達成</span>' : '') + '</div>' +
+        '<div class="weekrow"><div class="dots" aria-hidden="true">' + wd.dots + '</div><span class="note">クリア ' + wd.clear + '日</span></div>' +
+        '<p class="week-sub">' + (mv != null ? '就寝のズレ 平均' + Math.round(mv) + '分' : '就寝のズレ —') + ' · 週末の評価額 ' + yen(sim[b].value) + '</p></div>');
+    }
+    return '<section class="card"><div class="card-head"><h2>週ごとの振り返り</h2><span class="note">週5日できればOK</span></div>' + rows.reverse().join('') + '</section>';
+  }
+
+  function reviewView(sim) {
+    return (S.day >= 30 ? revealCard(sim) : lockedCard()) + weeksCard(sim);
+  }
+
+  /* ---- 描画 ---- */
+  var main = document.getElementById('main');
+  var range = document.getElementById('dayRange');
+  var playBtn = document.getElementById('play');
+  var dockDemo = document.getElementById('dockDemo');
+  var dockMine = document.getElementById('dockMine');
+  var PLAY = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>';
+  var PAUSE = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
+  var FINE = '<p class="fine">学習用のシミュレーションです。実際の売買や換金はできません。睡眠の数値は記録や推定にもとづく目安で、医療上のアドバイスではありません。眠れない日が2週間以上続くときは、医師に相談してください。</p>';
+
+  function updateDock() {
+    var demo = S.mode === 'demo';
+    dockDemo.hidden = !demo;
+    dockMine.hidden = demo;
+    if (demo) {
+      if (+range.value !== S.day) range.value = S.day;
+      document.getElementById('dayno').textContent = S.day + ' / 30日';
+      playBtn.innerHTML = S.playing ? PAUSE : PLAY;
+      playBtn.setAttribute('aria-label', S.playing ? '早送りを止める' : '1か月を早送り');
+      document.getElementById('dockNote').textContent = S.playing ? '早送り中…' : 'デモ操作 · ▶で1か月を早送り';
+    } else {
+      var p = MINE.pending, btn = document.getElementById('mineBtn');
+      document.getElementById('mineState').textContent = p ? hhmm(new Date(p)) + ' から記録中' : '今夜の記録';
+      document.getElementById('mineNote').textContent = S.msg || (p ? '朝に「おきた」を押します' : '寝る前に「ねる」を押します');
+      btn.textContent = p ? 'おきた' : 'ねる';
+      btn.setAttribute('data-act', p ? 'wake-now' : 'bed-now');
+      document.getElementById('mineCancel').hidden = !p;
+    }
+  }
+
+  function render() {
+    var act = document.activeElement, fid = act && act.dataset ? act.dataset.fid : null;
+    var sim = simulate();
+    main.innerHTML = (S.tab === 'home' ? homeView(sim) : S.tab === 'setup' ? setupView() : reviewView(sim)) + FINE;
+    ['home', 'setup', 'review'].forEach(function (k) { document.getElementById('tab-' + k).setAttribute('aria-selected', String(S.tab === k)); });
+    updateDock();
+    if (fid) { var el = main.querySelector('[data-fid="' + fid + '"]'); if (el) el.focus({ preventScroll: true }); }
+  }
+
+  /* ---- 操作 ---- */
+  var timer = null;
+  function halt() { S.playing = false; if (timer) { clearInterval(timer); timer = null; } }
+  function togglePlay() {
+    if (S.playing) { halt(); render(); return; }
+    if (S.day >= 30) S.day = 1;
+    S.playing = true; render();
+    timer = setInterval(function () {
+      S.day++;
+      if (S.day >= 30) { S.day = 30; halt(); }
+      render();
+    }, 420);
+  }
+  function setMode(m) {
+    halt();
+    S.mode = m; S.manual = {}; S.editing = false; S.formMsg = ''; S.msg = ''; S.confirmReset = false;
+    applyTarget();
+    S.day = m === 'demo' ? 12 : maxDay();
+    save();
+  }
+  function bedNow() {
+    if (isEnded()) { S.msg = '30日のチャレンジが終わっています。設定でリセットしてください。'; return; }
+    MINE.pending = new Date().getTime(); save();
+    S.msg = '就寝時刻を記録しました。おやすみなさい。';
+  }
+  function wakeNow() {
+    var p = MINE.pending, now = new Date();
+    if (isEnded()) { S.msg = '30日のチャレンジが終わっています。設定でリセットしてください。'; return; }
+    if (!p) { S.msg = '「ねる」の記録がありません。時刻を入力してください。'; S.editing = true; return; }
+    var diff = now.getTime() - p;
+    if (diff < 0 || diff > 18 * 3600000) {
+      MINE.pending = null; save();
+      S.msg = '「ねる」の記録が古いため、破棄しました。時刻を入力してください。'; S.editing = true; return;
+    }
+    var wk = dkey(now);
+    if (!MINE.start || wk < MINE.start) MINE.start = wk;
+    S.day = Math.max(1, mineToday() + 1);
+    var r = ensureRec(S.day - 1);
+    r.bed = ax(hhmm(new Date(p))); r.wake = ax(hhmm(now));
+    MINE.pending = null; save();
+    S.msg = '記録しました: ' + clock(r.bed) + ' → ' + clock(r.wake);
+  }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-act]');
+    if (!t) return;
+    var a = t.dataset.act, k = t.dataset.key;
+    S.msg = '';
+    if (a === 'play') { togglePlay(); return; }
+    if (a === 'tab') { S.tab = k; window.scrollTo(0, 0); }
+    else if (a === 'mode') { setMode(k); S.tab = 'home'; window.scrollTo(0, 0); }
+    else if (a === 'flag') { var i = S.day - 1; setFlag(i, k, !flag(i, k)); }
+    else if (a === 'task') {
+      var has = S.tasks.indexOf(k) >= 0;
+      if (has) {
+        if (S.tasks.length <= 2) S.hint = '課題は最低2つ必要です。';
+        else { S.tasks = S.tasks.filter(function (x) { return x !== k; }); S.hint = ''; }
+      } else if (S.tasks.length >= 3) S.hint = '課題は最大3つまでです。ほかを外すと入れ替えられます。';
+      else { S.tasks = Object.keys(TASKS).filter(function (x) { return x === k || S.tasks.indexOf(x) >= 0; }); S.hint = ''; }
+      save();
+    }
+    else if (a === 'preset') { S.preset = k; save(); }
+    else if (a === 'goto30') { halt(); S.day = 30; }
+    else if (a === 'review') { S.tab = 'review'; window.scrollTo(0, 0); }
+    else if (a === 'bed-now') bedNow();
+    else if (a === 'wake-now') wakeNow();
+    else if (a === 'bed-cancel') { MINE.pending = null; save(); S.msg = '「ねる」の記録を取り消しました。'; }
+    else if (a === 'edit-open') { S.editing = true; S.formMsg = ''; }
+    else if (a === 'edit-close') { S.editing = false; S.formMsg = ''; }
+    else if (a === 'reset-ask') S.confirmReset = true;
+    else if (a === 'reset-cancel') S.confirmReset = false;
+    else if (a === 'reset-do') {
+      MINE.start = null; MINE.records = {}; MINE.pending = null; S.confirmReset = false; S.day = 1; S.editing = false; save();
+      S.msg = '記録を削除しました。';
+    }
+    render();
+  });
+
+  document.addEventListener('submit', function (e) {
+    if (e.target.id !== 'sleepForm') return;
+    e.preventDefault();
+    var b = document.getElementById('inBed').value, w = document.getElementById('inWake').value;
+    if (!b || !w) { S.formMsg = '就寝と起床の時刻を入力してください。'; render(); return; }
+    var ab = ax(b), aw = ax(w);
+    if (aw <= ab || aw - ab > 16 * 60) { S.formMsg = '起床は就寝より後で、16時間以内にしてください。'; render(); return; }
+    var r = ensureRec(S.day - 1);
+    r.bed = ab; r.wake = aw;
+    S.editing = false; S.formMsg = ''; S.msg = '記録しました: ' + clock(ab) + ' → ' + clock(aw);
+    save(); render();
+  });
+
+  document.addEventListener('change', function (e) {
+    var id = e.target.id, v = e.target.value;
+    if (!v) return;
+    if (id === 'tgBed' || id === 'tgWake') {
+      if (id === 'tgBed') MINE.tbed = v; else MINE.twake = v;
+      applyTarget(); save(); render();
+    } else if (id === 'startDate') {
+      var t = todayKey();
+      MINE.start = v > t ? t : v;
+      S.day = maxDay(); save(); render();
+    }
+  });
+
+  range.addEventListener('input', function () { halt(); S.day = +range.value; render(); });
+
+  /* グラフをなぞって日付を動かす(捕捉は、描き直されない main 側で行う) */
+  var scrub = false;
+  function dayFromEvent(e) {
+    var svg = document.getElementById('chart');
+    if (!svg) return null;
+    var r = svg.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W;
+    return Math.min(maxDay(), Math.max(1, Math.round((x - L) / PW * 30 + 0.5)));
+  }
+  function setDay(d) { if (d == null || d === S.day) return; halt(); S.day = d; render(); }
+  main.addEventListener('pointerdown', function (e) {
+    if (!e.target.closest('#chart')) return;
+    scrub = true;
+    try { main.setPointerCapture(e.pointerId); } catch (err) { /* 非対応でも動く */ }
+    setDay(dayFromEvent(e));
+  });
+  main.addEventListener('pointermove', function (e) { if (scrub) setDay(dayFromEvent(e)); });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (n) { main.addEventListener(n, function () { scrub = false; }); });
+
+  load();
+  applyTarget();
+  if (S.mode === 'mine') S.day = maxDay();
+  render();
+})();
+</script>

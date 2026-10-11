@@ -1,0 +1,17 @@
+# OS
+.DS_Store
+
+# 依存・ビルド
+node_modules/
+dist/
+.expo/
+.wrangler/
+coverage/
+
+# シークレット(コミットしない)
+.env
+.env.*
+.dev.vars
+
+# ログ
+*.log
