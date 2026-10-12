@@ -1,9 +1,8 @@
 import { DAYS, PRESETS, PX } from "./constants";
 import type { PresetKey, Reveal, SimDay } from "./types";
 
-/** 30 日目の答え合わせ。世界株式の最大下落と、積立した時期ごとの増減を出す。 */
-export function reveal(sim: readonly SimDay[], preset: PresetKey): Reveal {
-  const w = PRESETS[preset];
+/** 世界株式の価格系列から、最大下落(最高値 → 底)を求める。day は 1 始まり。 */
+export function eqDrawdown(): { maxDD: number; peakDay: number; troughDay: number } {
   let runPeak = 1;
   let runDay = 0;
   let maxDD = 0;
@@ -22,6 +21,13 @@ export function reveal(sim: readonly SimDay[], preset: PresetKey): Reveal {
       peakDay = runDay;
     }
   }
+  return { maxDD, peakDay, troughDay };
+}
+
+/** 30 日目の答え合わせ。世界株式の最大下落と、積立した時期ごとの増減を出す。 */
+export function reveal(sim: readonly SimDay[], preset: PresetKey): Reveal {
+  const w = PRESETS[preset];
+  const { maxDD, peakDay, troughDay } = eqDrawdown();
   const ranges = [
     { n: "下落の前", a: 1, b: peakDay },
     { n: "下落の最中", a: peakDay + 1, b: troughDay },

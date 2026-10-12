@@ -1,14 +1,44 @@
-import { dateKey, pendingState, wakeRecord, type PendingState, type Settings, type TaskKey } from '@nekase/core';
+import {
+  DEMO_RECORDS,
+  DEMO_SETTINGS,
+  dateKey,
+  elapsedDays,
+  pendingState,
+  simRecords,
+  simulate,
+  wakeRecord,
+  type DayRecord,
+  type PendingState,
+  type Settings,
+  type SimDay,
+  type TaskKey,
+} from '@nekase/core';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
-import { toSettings } from './convert';
+import { toDayRecord, toSettings } from './convert';
 import { createStorage, defaultSettings, type RecordRow, type SettingsRow, type Storage } from '@/storage';
+
+/** グラフ用の 30 日分のデータ。デモ表示のときは、デモの記録と設定を使う。 */
+export interface ChartData {
+  demo: boolean;
+  settings: Settings;
+  /** 1 日目から 30 日分。記録がない日は null */
+  records: (DayRecord | null)[];
+  /** 経過日数(0〜30)。0 は、まだ始まっていない */
+  elapsed: number;
+  /** 30 日分の計算結果(経過日より先は、記録なしとして計算した値) */
+  sim: SimDay[];
+  startDate: string | null;
+}
 
 interface NekaseValue {
   /** 読み込みが終わるまで false */
   ready: boolean;
   records: RecordRow[];
   settings: Settings;
+  chart: ChartData;
+  /** デモデータの表示(保存しない。再読み込みで戻る) */
+  setDemo: (on: boolean) => void;
   /** 保存用の設定(目標時刻の文字列、開始日など) */
   settingsRow: SettingsRow;
   /** 今日の起床日 'YYYY-MM-DD' */
@@ -42,6 +72,7 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
   const [records, setRecords] = useState<RecordRow[]>([]);
   const [settingsRow, setSettingsRow] = useState<SettingsRow>(() => defaultSettings(0));
   const settings = useMemo<Settings>(() => toSettings(settingsRow), [settingsRow]);
+  const [demo, setDemo] = useState(false);
   const [bedTs, setBedTs] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -156,11 +187,37 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
     setNotice(null);
   }, [s, now]);
 
+  const todayKey = dateKey(new Date(now()));
+  const chart = useMemo<ChartData>(() => {
+    if (demo) {
+      return {
+        demo,
+        settings: DEMO_SETTINGS,
+        records: DEMO_RECORDS,
+        elapsed: 30,
+        sim: simulate(DEMO_RECORDS, DEMO_SETTINGS),
+        startDate: null,
+      };
+    }
+    const rows = records.map((r) => ({ date: r.date, ...toDayRecord(r)! }));
+    const recs = simRecords(rows, settingsRow.start_date);
+    return {
+      demo,
+      settings,
+      records: recs,
+      elapsed: elapsedDays(settingsRow.start_date, todayKey),
+      sim: simulate(recs, settings),
+      startDate: settingsRow.start_date,
+    };
+  }, [demo, records, settings, settingsRow.start_date, todayKey]);
+
   const value = useMemo<NekaseValue>(
     () => ({
       ready,
       records,
       settings,
+      chart,
+      setDemo,
       settingsRow,
       today: dateKey(new Date(now())),
       pending: pendingState(bedTs, now()),
@@ -174,7 +231,7 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
       resetAll,
       saveSleep,
     }),
-    [ready, records, settings, settingsRow, saveSettings, resetAll, toggleSelf, bedTs, notice, pressBed, cancelBed, pressWake, saveSleep, now],
+    [ready, records, settings, settingsRow, chart, saveSettings, resetAll, toggleSelf, bedTs, notice, pressBed, cancelBed, pressWake, saveSleep, now],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
