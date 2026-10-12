@@ -14,6 +14,8 @@ interface NekaseValue {
   pressBed: () => Promise<void>;
   cancelBed: () => Promise<void>;
   pressWake: () => Promise<void>;
+  /** 時刻の修正。同じ起床日があれば上書き(課題のチェックは引き継ぐ) */
+  saveSleep: (date: string, bed: number, wake: number) => Promise<void>;
 }
 
 const Ctx = createContext<NekaseValue | null>(null);
@@ -84,6 +86,22 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
     setBedTs(null);
   }, [s, now, bedTs]);
 
+  const saveSleep = useCallback(
+    async (date: string, bed: number, wake: number) => {
+      const old = await s.getRecord(date);
+      await s.putRecord({
+        date,
+        bed_min: bed,
+        wake_min: wake,
+        screen: old?.screen ?? 0,
+        caffeine: old?.caffeine ?? 0,
+        updated_at: now(),
+      });
+      setRecords(await s.getRecords());
+    },
+    [s, now],
+  );
+
   const value = useMemo<NekaseValue>(
     () => ({
       ready,
@@ -94,8 +112,9 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
       pressBed,
       cancelBed,
       pressWake,
+      saveSleep,
     }),
-    [ready, records, bedTs, notice, pressBed, cancelBed, pressWake, now],
+    [ready, records, bedTs, notice, pressBed, cancelBed, pressWake, saveSleep, now],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
