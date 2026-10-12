@@ -56,7 +56,7 @@ pnpm ワークスペースです。
 | `POST /v1/accounts` | 匿名アカウントを作り、`{accountId, token}` を返す | 実装済み |
 | `POST /v1/sync` | `{since, changes}` を送り、`{serverTime, changes}` を受け取る。記録・設定・FX の取引・台帳を同期する | 実装済み |
 | `POST /v1/link/start` / `POST /v1/link/redeem` | 引き継ぎコード(8 文字、10 分、1 回限り)の発行と引き換え。引き換えは、同じ送信元から 10 分に 5 回まで | 実装済み |
-| `DELETE /v1/account` | アカウントと全データを削除する | これから |
+| `DELETE /v1/account` | アカウントと全データ(引き継ぎのトークンとコードを含む)を削除する。元に戻せない | 実装済み |
 
 認証が必要な API は、`Authorization: Bearer <accountId>.<token>` のヘッダーを付けます。エラーは `{ "error": { "code": "...", "message": "..." } }` の形で返します。
 
