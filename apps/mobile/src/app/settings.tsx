@@ -1,0 +1,183 @@
+import { clock, normalizeStartDate, normalizeTime, PRESETS, toggleTask, type PresetKey, type TaskKey } from '@nekase/core';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { useNekase } from '@/state/nekase-provider';
+
+const TASK_LABELS: Record<TaskKey, string> = {
+  bed: '就寝時刻を守る',
+  wake: '起床時刻をそろえる',
+  screen: '寝る1時間前に画面を閉じる',
+  caffeine: '夕方以降はカフェインを控える',
+};
+const TASK_ORDER: TaskKey[] = ['bed', 'wake', 'screen', 'caffeine'];
+
+export default function SettingsScreen() {
+  const theme = useTheme();
+  const { ready, settings, settingsRow, today, saveSettings, resetAll } = useNekase();
+  const [bed, setBed] = useState(settingsRow.target_bed);
+  const [wake, setWake] = useState(settingsRow.target_wake);
+  const [start, setStart] = useState(settingsRow.start_date ?? '');
+  const [message, setMessage] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+
+  // 保存データの読み込みが終わったら、入力欄に反映する
+  useEffect(() => {
+    setBed(settingsRow.target_bed);
+    setWake(settingsRow.target_wake);
+    setStart(settingsRow.start_date ?? '');
+  }, [ready, settingsRow.target_bed, settingsRow.target_wake, settingsRow.start_date]);
+
+  const saveTimes = async () => {
+    const b = normalizeTime(bed);
+    const w = normalizeTime(wake);
+    const sd = normalizeStartDate(start);
+    if (!b || !w) return setMessage('⚠ 目標時刻は HH:MM の形で入れてください。');
+    if (sd === undefined) return setMessage('⚠ 開始日は、実在する日付を YYYY-MM-DD の形で入れてください。(空なら未設定)');
+    await saveSettings({ target_bed: b, target_wake: w, start_date: sd });
+    setMessage('✓ 保存しました');
+  };
+
+  const onTask = async (t: TaskKey) => {
+    const r = toggleTask(settings.tasks, t);
+    if (!r.ok) return setMessage(`⚠ ${r.error}`);
+    await saveSettings({ tasks_json: JSON.stringify(r.tasks) });
+    setMessage(null);
+  };
+
+  const input = [styles.input, { borderColor: theme.line, color: theme.text, backgroundColor: theme.background }];
+  const card = [styles.card, { borderColor: theme.line }];
+
+  return (
+    <ThemedView style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <ThemedText type="subtitle">設定</ThemedText>
+          {message && (
+            <ThemedText type="small" style={{ color: message.startsWith('✓') ? theme.goodInk : theme.assetInk }}>
+              {message}
+            </ThemedText>
+          )}
+
+          <ThemedView type="backgroundElement" style={card}>
+            <ThemedText type="smallBold">目標時刻と開始日</ThemedText>
+            <View style={styles.row}>
+              <View style={styles.field}>
+                <ThemedText type="small" themeColor="textSecondary">目標の就寝</ThemedText>
+                <TextInput value={bed} onChangeText={setBed} maxLength={5} placeholder="23:30" placeholderTextColor={theme.textSecondary} style={input} />
+              </View>
+              <View style={styles.field}>
+                <ThemedText type="small" themeColor="textSecondary">目標の起床</ThemedText>
+                <TextInput value={wake} onChangeText={setWake} maxLength={5} placeholder="06:30" placeholderTextColor={theme.textSecondary} style={input} />
+              </View>
+            </View>
+            <View style={styles.field}>
+              <ThemedText type="small" themeColor="textSecondary">開始日(YYYY-MM-DD。空なら未設定)</ThemedText>
+              <TextInput value={start} onChangeText={setStart} maxLength={10} placeholder="2026-10-12" placeholderTextColor={theme.textSecondary} style={input} />
+              <Pressable accessibilityRole="button" onPress={() => setStart(today)} style={styles.link}>
+                <ThemedText type="small" themeColor="sleepInk" style={styles.underline}>今日にする</ThemedText>
+              </Pressable>
+            </View>
+            <Pressable accessibilityRole="button" onPress={saveTimes} style={[styles.button, { backgroundColor: theme.sleep }]}>
+              <ThemedText type="smallBold" style={{ color: theme.onSleep }}>保存</ThemedText>
+            </Pressable>
+            <ThemedText type="small" themeColor="textSecondary">
+              いまの目標: 就寝 {clock(settings.targetBed)} / 起床 {clock(settings.targetWake)}(前後30分が達成)
+            </ThemedText>
+          </ThemedView>
+
+          <ThemedView type="backgroundElement" style={card}>
+            <ThemedText type="smallBold">行動課題(2〜3個)</ThemedText>
+            {TASK_ORDER.map((t) => {
+              const on = settings.tasks.includes(t);
+              return (
+                <Pressable
+                  key={t}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: on }}
+                  onPress={() => onTask(t)}
+                  style={[styles.option, { borderColor: on ? theme.sleep : theme.line, borderWidth: on ? 2 : 1 }]}>
+                  <ThemedText type="smallBold" themeColor={on ? 'sleepInk' : 'text'}>{on ? '☑' : '☐'}</ThemedText>
+                  <ThemedText type="small" style={styles.grow}>{TASK_LABELS[t]}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">{t === 'screen' || t === 'caffeine' ? '自己申告' : '自動'}</ThemedText>
+                </Pressable>
+              );
+            })}
+          </ThemedView>
+
+          <ThemedView type="backgroundElement" style={card}>
+            <ThemedText type="smallBold">積立の配分(世界株式 / 債券 / 現金)</ThemedText>
+            {(Object.keys(PRESETS) as PresetKey[]).map((k) => {
+              const p = PRESETS[k];
+              const on = settings.preset === k;
+              return (
+                <Pressable
+                  key={k}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: on }}
+                  onPress={() => saveSettings({ preset: k })}
+                  style={[styles.option, { borderColor: on ? theme.asset : theme.line, borderWidth: on ? 2 : 1 }]}>
+                  <ThemedText type="smallBold" themeColor={on ? 'assetInk' : 'text'}>{on ? '●' : '○'}</ThemedText>
+                  <ThemedText type="small" style={styles.grow}>{p.name}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {Math.round(p.eq * 100)} / {Math.round(p.bd * 100)} / {Math.round(p.cash * 100)}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </ThemedView>
+
+          <ThemedView type="backgroundElement" style={card}>
+            <ThemedText type="smallBold">リセット</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">この端末の記録と設定をすべて消します。元に戻せません。</ThemedText>
+            {confirmReset ? (
+              <View style={styles.row}>
+                <Pressable accessibilityRole="button" onPress={() => setConfirmReset(false)} style={[styles.button, styles.grow, { borderColor: theme.sleep, borderWidth: 2 }]}>
+                  <ThemedText type="smallBold" themeColor="sleepInk">やめる</ThemedText>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={async () => {
+                    await resetAll();
+                    setConfirmReset(false);
+                    setMessage('✓ リセットしました');
+                  }}
+                  style={[styles.button, styles.grow, { backgroundColor: theme.assetL3 }]}>
+                  <ThemedText type="smallBold" style={{ color: '#FFFFFF' }}>本当に消す</ThemedText>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable accessibilityRole="button" onPress={() => setConfirmReset(true)} style={[styles.button, { borderColor: theme.assetL3, borderWidth: 2 }]}>
+                <ThemedText type="smallBold" themeColor="assetInk">リセットする</ThemedText>
+              </Pressable>
+            )}
+          </ThemedView>
+
+          <ThemedText type="small" themeColor="textSecondary">
+            学習用のシミュレーションです。実際の売買や換金はできません
+          </ThemedText>
+        </ScrollView>
+      </SafeAreaView>
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
+  safeArea: { flex: 1, maxWidth: MaxContentWidth },
+  scroll: { padding: Spacing.four, gap: Spacing.three, paddingBottom: BottomTabInset + Spacing.six },
+  card: { borderWidth: 1, borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  row: { flexDirection: 'row', gap: Spacing.three },
+  field: { flex: 1, gap: Spacing.one },
+  input: { minHeight: 48, borderWidth: 1, borderRadius: Spacing.two, paddingHorizontal: Spacing.three, fontSize: 16 },
+  link: { minHeight: 44, justifyContent: 'center' },
+  underline: { textDecorationLine: 'underline' },
+  button: { minHeight: 48, borderRadius: Spacing.three, alignItems: 'center', justifyContent: 'center' },
+  option: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: Spacing.three, borderRadius: Spacing.two, paddingHorizontal: Spacing.three },
+  grow: { flex: 1 },
+});
