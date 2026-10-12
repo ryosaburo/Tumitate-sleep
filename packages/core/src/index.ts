@@ -6,3 +6,4 @@ export * from "./achievement";
 export * from "./simulate";
 export * from "./weekly";
 export * from "./reveal";
+export * from "./sleepButton";
