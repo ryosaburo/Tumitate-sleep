@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
-import schema from "../../migrations/0001_init.sql?raw";
+import init from "../../migrations/0001_init.sql?raw";
+import accountTokens from "../../migrations/0002_account_tokens.sql?raw";
 import type { Bindings } from "../env";
 
 /**
@@ -30,7 +31,8 @@ class Statement {
 
 export function createTestD1(): D1Database {
   const db = new DatabaseSync(":memory:");
-  db.exec(schema);
+  // マイグレーションを、番号の順に流す(新しいファイルを足したら、ここにも足す)
+  for (const sql of [init, accountTokens]) db.exec(sql);
   return {
     prepare: (sql: string) => new Statement(db, sql),
     // D1 の batch と同じく、全部成功するか、全部なかったことにする
