@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { TaskCards } from '@/components/task-cards';
 import { SleepEditForm } from '@/components/sleep-edit-form';
 import { SleepBar } from '@/components/sleep-bar';
 import { ThemedText } from '@/components/themed-text';
@@ -10,7 +11,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useNekase } from '@/state/nekase-provider';
 
 export default function HomeScreen() {
-  const { notice, records } = useNekase();
+  const { notice } = useNekase();
   const [editing, setEditing] = useState(false);
   return (
     <ThemedView style={styles.container}>
@@ -18,7 +19,7 @@ export default function HomeScreen() {
         <ScrollView contentContainerStyle={styles.scroll}>
         <ThemedText type="subtitle">ホーム</ThemedText>
         {notice && <ThemedText themeColor="assetInk">{notice}</ThemedText>}
-        <ThemedText themeColor="textSecondary">記録 {records.length} 件(作成中)</ThemedText>
+        <TaskCards />
         {editing ? (
           <SleepEditForm onClose={() => setEditing(false)} />
         ) : (
