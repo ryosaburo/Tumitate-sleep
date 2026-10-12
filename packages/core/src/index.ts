@@ -8,3 +8,4 @@ export * from "./weekly";
 export * from "./reveal";
 export * from "./sleepButton";
 export * from "./sleepEdit";
+export * from "./settingsEdit";

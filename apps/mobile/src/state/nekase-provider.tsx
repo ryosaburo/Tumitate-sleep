@@ -2,13 +2,15 @@ import { dateKey, pendingState, wakeRecord, type PendingState, type Settings, ty
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { toSettings } from './convert';
-import { createStorage, defaultSettings, type RecordRow, type Storage } from '@/storage';
+import { createStorage, defaultSettings, type RecordRow, type SettingsRow, type Storage } from '@/storage';
 
 interface NekaseValue {
   /** 読み込みが終わるまで false */
   ready: boolean;
   records: RecordRow[];
   settings: Settings;
+  /** 保存用の設定(目標時刻の文字列、開始日など) */
+  settingsRow: SettingsRow;
   /** 今日の起床日 'YYYY-MM-DD' */
   today: string;
   pending: PendingState;
@@ -21,6 +23,10 @@ interface NekaseValue {
   /** 時刻の修正。同じ起床日があれば上書き(課題のチェックは引き継ぐ) */
   /** 自己申告の課題(screen / caffeine)のチェックを切り替える。今日の記録がなければ作る */
   toggleSelf: (task: Extract<TaskKey, 'screen' | 'caffeine'>) => Promise<void>;
+  /** 設定の一部を保存する。「ねる」の途中状態は変えない */
+  saveSettings: (patch: Partial<Pick<SettingsRow, 'target_bed' | 'target_wake' | 'start_date' | 'tasks_json' | 'preset'>>) => Promise<void>;
+  /** 端末内の全データを消す */
+  resetAll: () => Promise<void>;
   saveSleep: (date: string, bed: number, wake: number) => Promise<void>;
 }
 
@@ -34,7 +40,8 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
 
   const [ready, setReady] = useState(false);
   const [records, setRecords] = useState<RecordRow[]>([]);
-  const [settings, setSettings] = useState<Settings>(() => toSettings(defaultSettings(0)));
+  const [settingsRow, setSettingsRow] = useState<SettingsRow>(() => defaultSettings(0));
+  const settings = useMemo<Settings>(() => toSettings(settingsRow), [settingsRow]);
   const [bedTs, setBedTs] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -42,7 +49,7 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
     (async () => {
       const [recs, ts, st] = await Promise.all([s.getRecords(), s.getPendingBed(), s.getSettings()]);
       setRecords(recs);
-      if (st) setSettings(toSettings(st));
+      if (st) setSettingsRow(st);
       // 18 時間以上たった「ねる」は破棄して、時刻入力を促す
       if (ts !== null && pendingState(ts, now()).kind === 'stale') {
         await s.setPendingBed(null, now());
@@ -129,11 +136,32 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
     [s, now],
   );
 
+  const saveSettings = useCallback<NekaseValue['saveSettings']>(
+    async (patch) => {
+      const t = now();
+      // 「ねる」の途中状態は保存側が持っているので、最新の行に重ねる
+      const cur = (await s.getSettings()) ?? defaultSettings(t);
+      const next = { ...cur, ...patch, updated_at: t };
+      await s.putSettings(next);
+      setSettingsRow(next);
+    },
+    [s, now],
+  );
+
+  const resetAll = useCallback(async () => {
+    await s.clear();
+    setRecords([]);
+    setBedTs(null);
+    setSettingsRow(defaultSettings(now()));
+    setNotice(null);
+  }, [s, now]);
+
   const value = useMemo<NekaseValue>(
     () => ({
       ready,
       records,
       settings,
+      settingsRow,
       today: dateKey(new Date(now())),
       pending: pendingState(bedTs, now()),
       notice,
@@ -142,9 +170,11 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
       cancelBed,
       pressWake,
       toggleSelf,
+      saveSettings,
+      resetAll,
       saveSleep,
     }),
-    [ready, records, settings, toggleSelf, bedTs, notice, pressBed, cancelBed, pressWake, saveSleep, now],
+    [ready, records, settings, settingsRow, saveSettings, resetAll, toggleSelf, bedTs, notice, pressBed, cancelBed, pressWake, saveSleep, now],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
