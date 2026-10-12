@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TaskCards } from '@/components/task-cards';
 import { SleepEditForm } from '@/components/sleep-edit-form';
+import { ChartSection } from '@/components/chart/chart-section';
 import { SleepBar } from '@/components/sleep-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -20,6 +21,7 @@ export default function HomeScreen() {
         <ThemedText type="subtitle">ホーム</ThemedText>
         {notice && <ThemedText themeColor="assetInk">{notice}</ThemedText>}
         <TaskCards />
+        <ChartSection />
         {editing ? (
           <SleepEditForm onClose={() => setEditing(false)} />
         ) : (

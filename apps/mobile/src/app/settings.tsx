@@ -19,7 +19,7 @@ const TASK_ORDER: TaskKey[] = ['bed', 'wake', 'screen', 'caffeine'];
 
 export default function SettingsScreen() {
   const theme = useTheme();
-  const { ready, settings, settingsRow, today, saveSettings, resetAll } = useNekase();
+  const { ready, settings, settingsRow, today, saveSettings, resetAll, chart, setDemo } = useNekase();
   const [bed, setBed] = useState(settingsRow.target_bed);
   const [wake, setWake] = useState(settingsRow.target_wake);
   const [start, setStart] = useState(settingsRow.start_date ?? '');
@@ -130,6 +130,22 @@ export default function SettingsScreen() {
                 </Pressable>
               );
             })}
+          </ThemedView>
+
+          <ThemedView type="backgroundElement" style={card}>
+            <ThemedText type="smallBold">デモデータ</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              サンプルの30日分で、グラフを確認できます。自分の記録は変わりません。再読み込みで元に戻ります。
+            </ThemedText>
+            <Pressable
+              accessibilityRole="switch"
+              accessibilityState={{ checked: chart.demo }}
+              onPress={() => setDemo(!chart.demo)}
+              style={[styles.option, { borderColor: chart.demo ? theme.sleep : theme.line, borderWidth: chart.demo ? 2 : 1 }]}>
+              <ThemedText type="smallBold" themeColor={chart.demo ? 'sleepInk' : 'text'}>{chart.demo ? '☑' : '☐'}</ThemedText>
+              <ThemedText type="small" style={styles.grow}>デモデータを表示する</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">{chart.demo ? '表示中' : '非表示'}</ThemedText>
+            </Pressable>
           </ThemedView>
 
           <ThemedView type="backgroundElement" style={card}>
