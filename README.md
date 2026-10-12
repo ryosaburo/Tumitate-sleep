@@ -25,7 +25,87 @@ pnpm ワークスペースです。
 | `apps/api` | Cloudflare Workers + Hono + Zod + D1 |
 | `packages/core` | 計算ロジック(積立、複利の分解、判断力ゲージ、FX の損益など)。アプリと API の両方が使う |
 
-> 現在は雛形ができた段階です(画面と計算ロジックはこれから作ります)。
+## しくみ(どう動いているか)
+
+大きく3つの部品が、次のように動きます。
+
+```
+ iPhone / PC のブラウザ                       Cloudflare
+┌──────────────────────────┐   HTTPS    ┌──────────────────────────┐
+│ apps/mobile(アプリ)      │ ─────────▶ │ apps/api(Workers + Hono) │
+│  ・「ねる」「おきた」を記録  │   同期     │  ・アカウント作成・認証     │
+│  ・端末内に保存(まず手元に) │ ◀───────── │  ・記録の同期・引き継ぎ     │
+│  ・packages/core で計算     │            │        │                 │
+└──────────────────────────┘            │        ▼                 │
+                                         │   D1(SQLite のデータベース)│
+                                         └──────────────────────────┘
+```
+
+- **まず端末の中に保存します。** 記録はブラウザ(Web)または SQLite(ネイティブ)に保存します。ネットワークがなくても記録できます。
+- **計算は `packages/core` が担当します。** 積立額、評価額、複利の分、判定は、すべてここで計算します。アプリと API が同じ計算を使います。
+- **API は「端末どうしをつなぐ」だけです。** 匿名アカウントを作り、記録を同期し、引き継ぎコードで別の端末に同じ記録を渡します。計算や判定は API では行いません。
+- **アカウントは匿名です。** メールアドレスやパスワードは使いません。アカウント作成時に、ランダムなトークンを 1 回だけ端末に渡します。サーバーに保存するのは、そのトークンの**ハッシュだけ**です。2 台目をつなぐときは、引き継ぎコードと引き換えに、その端末用の新しいトークンを渡します(1 台目はそのまま使えます)。
+- **競合したら、あとから更新した方を残します。** 同じ日の記録を 2 台で変えたときは、行ごとに新しい方を採用します。
+- **サーバーに置くのは、日付・時刻・チェックの有無・取引の記録だけです。** 睡眠の音声やセンサーのデータは扱いません。
+
+### API の状況
+
+| エンドポイント | 内容 | 状況 |
+| --- | --- | --- |
+| `GET /health` | 動作確認 | 実装済み |
+| `POST /v1/accounts` | 匿名アカウントを作り、`{accountId, token}` を返す | 実装済み |
+| `POST /v1/sync` | `{since, changes}` を送り、`{serverTime, changes}` を受け取る。記録・設定・FX の取引・台帳を同期する | 実装済み |
+| `POST /v1/link/start` / `POST /v1/link/redeem` | 引き継ぎコード(8 文字、10 分、1 回限り)の発行と引き換え。引き換えは、同じ送信元から 10 分に 5 回まで | 実装済み |
+| `DELETE /v1/account` | アカウントと全データ(引き継ぎのトークンとコードを含む)を削除する。元に戻せない | 実装済み |
+
+認証が必要な API は、`Authorization: Bearer <accountId>.<token>` のヘッダーを付けます。エラーは `{ "error": { "code": "...", "message": "..." } }` の形で返します。
+
+## Cloudflare の動かし方(API と D1)
+
+API は Cloudflare Workers の上で動き、データは D1(SQLite)に入ります。D1 のスキーマは `apps/api/migrations/` のファイルで管理します(**既存のファイルは書き換えず、新しいファイルを足します**)。
+
+### 手元(ローカル)で動かす
+
+Cloudflare のアカウントは要りません。
+
+```sh
+cd apps/api
+pnpm exec wrangler d1 migrations apply nekase --local   # ローカルの D1 にテーブルを作る(最初の1回と、マイグレーションを足したとき)
+pnpm dev                                                # http://localhost:8787 で起動
+```
+
+別のターミナルで、動作を確かめます。
+
+```sh
+curl http://localhost:8787/health                  # {"ok":true}
+curl -X POST http://localhost:8787/v1/accounts     # {"accountId":"...","token":"..."}
+```
+
+- ローカルの D1 のデータは `apps/api/.wrangler/` に入ります(Git には入りません)。消すと、まっさらな状態に戻ります。
+- シークレットが必要になったら `apps/api/.dev.vars` に書きます。**コミットしません。**
+
+### テスト
+
+```sh
+pnpm -F api test
+```
+
+API のテストは、Node 22 の `node:sqlite` で作った D1 もどき(`apps/api/src/testing/d1.ts`)の上で動きます。**Node 22 以上が必要です**(`nvm use`)。本物の D1 と Workers での確認は、デプロイ後に行います。
+
+### 公開する(予定。ステップ7)
+
+次の流れで、Cloudflare に公開する予定です。まだ試していません。
+
+```sh
+pnpm exec wrangler login                       # ブラウザで Cloudflare にログイン
+cd apps/api
+pnpm exec wrangler d1 create nekase            # D1 を作る。表示された database_id を wrangler.toml に書く
+pnpm exec wrangler d1 migrations apply nekase --remote
+pnpm deploy                                    # Workers にデプロイ
+```
+
+- `wrangler.toml` の `database_id` は、いまは仮の値(ゼロ埋め)です。本物の ID や、Cloudflare のアカウント ID は、**チャットや Pull Request に貼りません。**
+- Web 版(`apps/mobile` を書き出したもの)は、Workers の静的アセットとして同じ場所から配信する予定です。
 
 ## ドキュメント
 
@@ -43,7 +123,7 @@ corepack enable             # pnpm を使えるようにする(最初の1回)
 pnpm install
 pnpm -F @nekase/core test   # 計算ロジックのテスト
 pnpm -F mobile web          # Web 版を起動
-pnpm -F api dev             # API をローカル起動(http://localhost:8787/health)
+pnpm -F api dev             # API をローカル起動(http://localhost:8787/health)。初回は先に D1 の準備が必要(下の「Cloudflare の動かし方」)
 pnpm check                  # 型チェック + lint + テスト
 ```
 

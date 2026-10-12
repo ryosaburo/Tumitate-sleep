@@ -2,4 +2,10 @@ name = "nekase-api"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
-# D1 はステップ6で追加する(アカウント ID などはここに書いたらチャットに貼らない)
+# D1。database_id は、ステップ7で `wrangler d1 create` したときの値に入れ替える。
+# (アカウント ID や database_id を、チャットや Pull Request に貼らない)
+[[d1_databases]]
+binding = "DB"
+database_name = "nekase"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
