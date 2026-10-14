@@ -92,20 +92,37 @@ pnpm -F api test
 
 API のテストは、Node 22 の `node:sqlite` で作った D1 もどき(`apps/api/src/testing/d1.ts`)の上で動きます。**Node 22 以上が必要です**(`nvm use`)。本物の D1 と Workers での確認は、デプロイ後に行います。
 
-### 公開する(予定。ステップ7)
+### Web 版も一緒に動かす(ローカル)
 
-次の流れで、Cloudflare に公開する予定です。まだ試していません。
+API の Worker は、Web 版(静的ファイル)も配信します。`/v1/*` と `/health` は Hono の API が、それ以外は静的ファイルが返ります(存在しないパスは `index.html`)。
 
 ```sh
-pnpm exec wrangler login                       # ブラウザで Cloudflare にログイン
-cd apps/api
-pnpm exec wrangler d1 create nekase            # D1 を作る。表示された database_id を wrangler.toml に書く
-pnpm exec wrangler d1 migrations apply nekase --remote
-pnpm deploy                                    # Workers にデプロイ
+pnpm build:web              # apps/mobile を書き出して apps/mobile/dist を作る(Expo の Web 出力)
+pnpm -F api dev             # http://localhost:8787 で、画面と API が同じ場所で動く
 ```
 
+`pnpm -F api dev` だけでも動きます(`dist` がなければ空のフォルダーを作ります。そのときは画面は出ず、API だけ動きます)。画面の開発中は、これまでどおり `pnpm -F mobile web` を使うのが速いです。
+
+### 公開する(Cloudflare へのデプロイ)
+
+公開は 1 つの Worker(`nekase`)で、画面と API を同じ URL から配信します。**初回だけ**、次を行います。
+
+```sh
+cd apps/api
+pnpm exec wrangler login                                    # ① ブラウザで Cloudflare にログイン(自分でやる)
+pnpm exec wrangler d1 create nekase                         # ② 本番の D1 を作る。表示された database_id を、wrangler.toml の database_id に書く
+pnpm exec wrangler d1 migrations apply nekase --remote      # ③ 本番の D1 にテーブルを作る
+cd ../..
+pnpm run deploy                                             # ④ Web 版を書き出し、Worker をデプロイ
+```
+
+2 回目以降(コードや画面を変えたあと)は、④だけです。マイグレーションを足したときは、③も行います。
+
+- ④ の最後に、公開 URL(`https://nekase.<サブドメイン>.workers.dev`)が表示されます。
+- **`pnpm deploy` ではなく `pnpm run deploy`** と書きます(`pnpm deploy` は、pnpm 自身の別のコマンドです)。
+- 公開後の確認: URL を開いて画面が出ること、`curl -X POST <URL>/v1/accounts` が `accountId` と `token` を返すことを見ます。
 - `wrangler.toml` の `database_id` は、いまは仮の値(ゼロ埋め)です。本物の ID や、Cloudflare のアカウント ID は、**チャットや Pull Request に貼りません。**
-- Web 版(`apps/mobile` を書き出したもの)は、Workers の静的アセットとして同じ場所から配信する予定です。
+- 設定を変えるのは `apps/api/wrangler.toml` です。画面の書き出し先(`apps/mobile/dist`)は Git に入りません。
 
 ## ドキュメント
 

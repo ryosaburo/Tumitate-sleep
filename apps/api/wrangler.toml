@@ -1,11 +1,19 @@
-name = "nekase-api"
+name = "nekase"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
+
+# Web 版(apps/mobile を `pnpm build:web` で書き出した dist)を、静的アセットとして配信する。
+# /v1/* と /health だけを、この Worker(Hono)が処理する。それ以外は静的ファイルを返し、
+# 存在しないパスは index.html を返す(SPA)。
+[assets]
+directory = "../mobile/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/v1/*", "/health"]
 
 # D1。database_id は、ステップ7で `wrangler d1 create` したときの値に入れ替える。
 # (アカウント ID や database_id を、チャットや Pull Request に貼らない)
 [[d1_databases]]
 binding = "DB"
 database_name = "nekase"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "b5701876-dbda-4703-adf0-357a28ece5b0"
 migrations_dir = "migrations"
