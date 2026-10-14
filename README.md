@@ -103,6 +103,20 @@ pnpm -F api dev             # http://localhost:8787 で、画面と API が同�
 
 `pnpm -F api dev` だけでも動きます(`dist` がなければ空のフォルダーを作ります。そのときは画面は出ず、API だけ動きます)。画面の開発中は、これまでどおり `pnpm -F mobile web` を使うのが速いです。
 
+### 同期を試す(ローカル)
+
+アプリは、開いたときと記録を変えたときに、API と同期します。通信できなくても、端末内には保存されます。
+
+- 本番の Web 版は、画面と API が同じ URL なので、設定は要りません。
+- `pnpm -F mobile web`(画面)と `pnpm -F api dev`(API)を別々に動かすときは、画面の側に API の場所を教えます。
+
+```
+EXPO_PUBLIC_API_URL=http://localhost:8787 pnpm -F mobile web
+```
+
+- ネイティブ(iPhone など)では、公開 URL を指定します。例: `EXPO_PUBLIC_API_URL=https://nekase.<サブドメイン>.workers.dev`
+- 引き継ぎは、設定の「ほかの端末に引き継ぐ」から行います(1台目でコードを発行し、2台目で入力)。
+
 ### 公開する(Cloudflare へのデプロイ)
 
 公開は 1 つの Worker(`nekase`)で、画面と API を同じ URL から配信します。**初回だけ**、次を行います。
