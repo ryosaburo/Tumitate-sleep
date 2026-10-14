@@ -105,7 +105,7 @@ pnpm -F api dev             # http://localhost:8787 で、画面と API が同�
 
 ### 公開する(Cloudflare へのデプロイ)
 
-公開は 1 つの Worker(`nekase-api`)で、画面と API を同じ URL から配信します。**初回だけ**、次を行います。
+公開は 1 つの Worker(`nekase`)で、画面と API を同じ URL から配信します。**初回だけ**、次を行います。
 
 ```sh
 cd apps/api
@@ -118,7 +118,7 @@ pnpm run deploy                                             # ④ Web 版を書�
 
 2 回目以降(コードや画面を変えたあと)は、④だけです。マイグレーションを足したときは、③も行います。
 
-- ④ の最後に、公開 URL(`https://nekase-api.<サブドメイン>.workers.dev`)が表示されます。
+- ④ の最後に、公開 URL(`https://nekase.<サブドメイン>.workers.dev`)が表示されます。
 - **`pnpm deploy` ではなく `pnpm run deploy`** と書きます(`pnpm deploy` は、pnpm 自身の別のコマンドです)。
 - 公開後の確認: URL を開いて画面が出ること、`curl -X POST <URL>/v1/accounts` が `accountId` と `token` を返すことを見ます。
 - `wrangler.toml` の `database_id` は、いまは仮の値(ゼロ埋め)です。本物の ID や、Cloudflare のアカウント ID は、**チャットや Pull Request に貼りません。**
