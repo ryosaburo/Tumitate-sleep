@@ -14,9 +14,23 @@ import {
   type TaskKey,
 } from '@nekase/core';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AppState } from 'react-native';
 
 import { toDayRecord, toSettings } from './convert';
 import { createStorage, defaultSettings, type RecordRow, type SettingsRow, type Storage } from '@/storage';
+import { createHttpApi, createSessionStore, createSyncEngine, type Credentials, type LinkCode, type LinkMode, type SyncEngine } from '@/sync';
+
+/** 連続した操作を、1 回の同期にまとめる待ち時間 */
+const SYNC_DELAY_MS = 1500;
+/** 同期に失敗したあと、もう一度ためすまでの時間 */
+const RETRY_MS = 30_000;
+
+/** 同期の状態。画面には「同期済み / 未同期」を出すだけで、エラーで操作を止めない。 */
+export interface SyncStatus {
+  state: 'idle' | 'syncing' | 'ok' | 'offline' | 'error';
+  /** 最後に同期できた時刻(ミリ秒)。まだなければ null */
+  lastSyncedAt: number | null;
+}
 
 /** グラフ用の 30 日分のデータ。デモ表示のときは、デモの記録と設定を使う。 */
 export interface ChartData {
@@ -58,6 +72,13 @@ interface NekaseValue {
   /** 端末内の全データを消す */
   resetAll: () => Promise<void>;
   saveSleep: (date: string, bed: number, wake: number) => Promise<void>;
+  syncStatus: SyncStatus;
+  /** 引き継ぎコードを発行する(1 台目)。失敗は ApiFailure を投げる */
+  startLink: () => Promise<LinkCode>;
+  /** コードを確かめて、認証情報を受け取る(2 台目)。端末にはまだ反映しない。失敗は ApiFailure を投げる */
+  redeemLink: (code: string) => Promise<Credentials>;
+  /** 受け取った認証情報を反映する。overwrite: 端末内を消して取り込む / merge: 両方を残す */
+  applyLink: (creds: Credentials, mode: LinkMode) => Promise<void>;
 }
 
 const Ctx = createContext<NekaseValue | null>(null);
@@ -75,6 +96,47 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
   const [demo, setDemo] = useState(false);
   const [bedTs, setBedTs] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({ state: 'idle', lastSyncedAt: null });
+
+  // 同期。他の端末の変更を取り込んだら、画面の状態を読み直す
+  const reloadRef = useRef<() => Promise<void>>(async () => {});
+  const engine = useRef<SyncEngine | null>(null);
+  if (engine.current === null) {
+    engine.current = createSyncEngine({
+      storage: s,
+      api: createHttpApi(process.env.EXPO_PUBLIC_API_URL ?? ''),
+      sessions: createSessionStore(),
+      now,
+      onApplied: () => void reloadRef.current(),
+    });
+  }
+  const eng = engine.current;
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const syncNow = useCallback(async () => {
+    setSyncStatus((p) => ({ ...p, state: 'syncing' }));
+    const r = await eng.sync();
+    if (r.ok) {
+      setSyncStatus({ state: 'ok', lastSyncedAt: now() });
+    } else {
+      setSyncStatus((p) => ({ ...p, state: r.reason === 'network' ? 'offline' : 'error' }));
+      // 通信できなかったときだけ、あとで自動的にもう一度ためす
+      if (r.reason === 'network') {
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => void syncNow(), RETRY_MS);
+      }
+    }
+  }, [eng, now]);
+
+  /** 記録や設定を変えたあとに呼ぶ。少し待って、まとめて 1 回同期する */
+  const scheduleSync = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => void syncNow(), SYNC_DELAY_MS);
+  }, [syncNow]);
+
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -90,20 +152,39 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
         setBedTs(ts);
       }
       setReady(true);
+      void syncNow(); // アプリを開いたとき
     })();
-  }, [s, now]);
+  }, [s, now, syncNow]);
+
+  // アプリに戻ってきたときも同期する
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active' && ready) void syncNow();
+    });
+    return () => sub.remove();
+  }, [ready, syncNow]);
+
+  // 他の端末の変更を取り込んだあと、端末内の保存から読み直す
+  reloadRef.current = async () => {
+    const [recs, ts, st] = await Promise.all([s.getRecords(), s.getPendingBed(), s.getSettings()]);
+    setRecords(recs);
+    setSettingsRow(st ?? defaultSettings(now()));
+    setBedTs(ts !== null && pendingState(ts, now()).kind === 'stale' ? null : ts);
+  };
 
   const pressBed = useCallback(async () => {
     const t = now();
     await s.setPendingBed(t, t);
     setBedTs(t);
     setNotice(null);
-  }, [s, now]);
+    scheduleSync();
+  }, [s, now, scheduleSync]);
 
   const cancelBed = useCallback(async () => {
     await s.setPendingBed(null, now());
     setBedTs(null);
-  }, [s, now]);
+    scheduleSync();
+  }, [s, now, scheduleSync]);
 
   const pressWake = useCallback(async () => {
     const t = now();
@@ -130,7 +211,8 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
     await s.setPendingBed(null, t);
     setRecords(await s.getRecords());
     setBedTs(null);
-  }, [s, now, bedTs]);
+    scheduleSync();
+  }, [s, now, bedTs, scheduleSync]);
 
   const saveSleep = useCallback(
     async (date: string, bed: number, wake: number) => {
@@ -144,8 +226,9 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
         updated_at: now(),
       });
       setRecords(await s.getRecords());
+      scheduleSync();
     },
-    [s, now],
+    [s, now, scheduleSync],
   );
 
   const toggleSelf = useCallback(
@@ -163,8 +246,9 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
         updated_at: t,
       });
       setRecords(await s.getRecords());
+      scheduleSync();
     },
-    [s, now],
+    [s, now, scheduleSync],
   );
 
   const saveSettings = useCallback<NekaseValue['saveSettings']>(
@@ -175,17 +259,33 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
       const next = { ...cur, ...patch, updated_at: t };
       await s.putSettings(next);
       setSettingsRow(next);
+      scheduleSync();
     },
-    [s, now],
+    [s, now, scheduleSync],
   );
 
   const resetAll = useCallback(async () => {
+    // 端末内を消すだけだと、次の同期でサーバーから戻ってくる。この端末を引き継ぎから外して、新しく始める
+    if (timer.current) clearTimeout(timer.current);
+    await eng.detach();
     await s.clear();
+    setSyncStatus({ state: 'idle', lastSyncedAt: null });
     setRecords([]);
     setBedTs(null);
     setSettingsRow(defaultSettings(now()));
     setNotice(null);
-  }, [s, now]);
+  }, [s, now, eng]);
+
+  const startLink = useCallback(() => eng.startLink(), [eng]);
+  const redeemLink = useCallback((code: string) => eng.redeemLink(code), [eng]);
+  const applyLink = useCallback(
+    async (creds: Credentials, mode: LinkMode) => {
+      await eng.applyLink(creds, mode);
+      await reloadRef.current();
+      await syncNow();
+    },
+    [eng, syncNow],
+  );
 
   const todayKey = dateKey(new Date(now()));
   const chart = useMemo<ChartData>(() => {
@@ -230,8 +330,12 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
       saveSettings,
       resetAll,
       saveSleep,
+      syncStatus,
+      startLink,
+      redeemLink,
+      applyLink,
     }),
-    [ready, records, settings, settingsRow, chart, saveSettings, resetAll, toggleSelf, bedTs, notice, pressBed, cancelBed, pressWake, saveSleep, now],
+    [ready, records, settings, settingsRow, chart, saveSettings, resetAll, toggleSelf, bedTs, notice, pressBed, cancelBed, pressWake, saveSleep, now, syncStatus, startLink, redeemLink, applyLink],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
