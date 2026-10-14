@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LinkCard } from '@/components/link-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -132,6 +133,8 @@ export default function SettingsScreen() {
             })}
           </ThemedView>
 
+          <LinkCard />
+
           <ThemedView type="backgroundElement" style={card}>
             <ThemedText type="smallBold">デモデータ</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
@@ -150,7 +153,7 @@ export default function SettingsScreen() {
 
           <ThemedView type="backgroundElement" style={card}>
             <ThemedText type="smallBold">リセット</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">この端末の記録と設定をすべて消します。元に戻せません。</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">この端末の記録と設定をすべて消し、引き継ぎも解除します。ほかの端末の記録は消えません。元に戻せません。</ThemedText>
             {confirmReset ? (
               <View style={styles.row}>
                 <Pressable accessibilityRole="button" onPress={() => setConfirmReset(false)} style={[styles.button, styles.grow, { borderColor: theme.sleep, borderWidth: 2 }]}>
