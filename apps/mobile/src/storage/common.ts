@@ -1,4 +1,4 @@
-import type { RecordRow, SettingsRow } from "./types";
+import type { FxOrderRow, RecordRow, SettingsRow } from "./types";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -77,4 +77,33 @@ export function parseSettingsRow(x: unknown): SettingsRow | null {
 /** 「あとから更新した方」を選ぶ。同時刻なら a(手元)を残す。 */
 export function newer<T extends { updated_at: number }>(a: T, b: T): T {
   return b.updated_at > a.updated_at ? b : a;
+}
+
+const STOPS = [0.5, 1, 2];
+
+/** 壊れた行は null を返す。 */
+export function parseFxOrderRow(x: unknown): FxOrderRow | null {
+  if (typeof x !== "object" || x === null) return null;
+  const r = x as Record<string, unknown>;
+  if (typeof r.date !== "string" || !DATE_RE.test(r.date)) return null;
+  if (r.pair !== "USD/JPY") return null;
+  if (r.side !== "buy" && r.side !== "sell") return null;
+  if (typeof r.notional !== "number" || !Number.isInteger(r.notional) || r.notional <= 0) return null;
+  if (typeof r.entry_rate !== "number" || !Number.isFinite(r.entry_rate) || r.entry_rate <= 0) return null;
+  if (typeof r.stop_pct !== "number" || !STOPS.includes(r.stop_pct)) return null;
+  if (typeof r.gauge !== "number" || !Number.isInteger(r.gauge) || r.gauge < 0 || r.gauge > 100) return null;
+  const reason = r.reason ?? null;
+  if (reason !== null && typeof reason !== "string") return null;
+  if (!isTime(r.updated_at)) return null;
+  return {
+    date: r.date,
+    pair: r.pair,
+    side: r.side,
+    notional: r.notional,
+    entry_rate: r.entry_rate,
+    stop_pct: r.stop_pct,
+    gauge: r.gauge,
+    reason,
+    updated_at: r.updated_at,
+  };
 }

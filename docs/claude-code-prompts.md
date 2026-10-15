@@ -10,6 +10,7 @@ VS Code の Claude Code に、順番に貼って使う。1つ終わったら、�
    - `docs/prototype/nekase.html`(プロトタイプ。見本)
    - `docs/claude-code-prompts.md`(このファイル)
    - AWS編を使うときは、`infra/aws` を作る(AWS-1 の依頼文で作られる)
+   - GitHub での進め方は、`docs/contributing.md` を見る(clone から PR まで)
 2. VS Code でリポジトリを開き、Claude Code を起動する。
 3. 下の依頼文を、上から順にコピーして貼る。`【担当】` は、そのステップをやる人。
 4. 1ステップごとに、ブランチを切って Pull Request にする。

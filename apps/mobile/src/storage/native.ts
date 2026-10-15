@@ -1,6 +1,6 @@
 import * as SQLite from "expo-sqlite";
-import { defaultSettings, parseRecordRow, parseSettingsRow, warn } from "./common";
-import type { RecordRow, SettingsRow, Storage } from "./types";
+import { defaultSettings, parseFxOrderRow, parseRecordRow, parseSettingsRow, warn } from "./common";
+import type { FxOrderRow, RecordRow, SettingsRow, Storage } from "./types";
 
 const DB_NAME = "nekase.db";
 
@@ -27,6 +27,13 @@ export function createNativeStorage(): Storage {
           target_bed TEXT, target_wake TEXT, start_date TEXT,
           tasks_json TEXT, preset TEXT,
           pending_bed_ts INTEGER, updated_at INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS fx_orders (
+          date TEXT PRIMARY KEY,
+          pair TEXT NOT NULL, side TEXT NOT NULL,
+          notional INTEGER NOT NULL, entry_rate REAL NOT NULL,
+          stop_pct REAL NOT NULL, gauge INTEGER NOT NULL,
+          reason TEXT, updated_at INTEGER NOT NULL DEFAULT 0
         );
       `);
       return d;
@@ -102,9 +109,32 @@ export function createNativeStorage(): Storage {
       const cur = (await readSettings()) ?? defaultSettings(now);
       await writeSettings({ ...cur, pending_bed_ts: ts, updated_at: now });
     },
+    async getFxOrders() {
+      try {
+        const rows = await (await db()).getAllAsync("SELECT * FROM fx_orders ORDER BY date ASC");
+        return rows.flatMap((x): FxOrderRow[] => {
+          const row = parseFxOrderRow(x);
+          if (!row) warn("壊れた注文を 1 件捨てました", x);
+          return row ? [row] : [];
+        });
+      } catch (e) {
+        warn("注文を読めませんでした。空として扱います", e);
+        return [];
+      }
+    },
+    async putFxOrder(r) {
+      await (
+        await db()
+      ).runAsync(
+        `INSERT OR REPLACE INTO fx_orders
+          (date, pair, side, notional, entry_rate, stop_pct, gauge, reason, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [r.date, r.pair, r.side, r.notional, r.entry_rate, r.stop_pct, r.gauge, r.reason, r.updated_at],
+      );
+    },
     async clear() {
       const d = await db();
-      await d.execAsync("DELETE FROM records; DELETE FROM settings;");
+      await d.execAsync("DELETE FROM records; DELETE FROM settings; DELETE FROM fx_orders;");
     },
   };
 }

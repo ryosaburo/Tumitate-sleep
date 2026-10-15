@@ -1,5 +1,13 @@
 import {
   DEMO_RECORDS,
+  axisNow,
+  fxState,
+  validateOrder,
+  type FxInput,
+  type FxOrder,
+  type FxOrderInput,
+  type FxReason,
+  type OrderError,
   DEMO_SETTINGS,
   dateKey,
   elapsedDays,
@@ -17,7 +25,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from 'react-native';
 
 import { toDayRecord, toSettings } from './convert';
-import { createStorage, defaultSettings, type RecordRow, type SettingsRow, type Storage } from '@/storage';
+import { createStorage, defaultSettings, type FxOrderRow, type RecordRow, type SettingsRow, type Storage } from '@/storage';
 import { createHttpApi, createSessionStore, createSyncEngine, type Credentials, type LinkCode, type LinkMode, type SyncEngine } from '@/sync';
 
 /** 連続した操作を、1 回の同期にまとめる待ち時間 */
@@ -45,7 +53,16 @@ export interface ChartData {
   startDate: string | null;
 }
 
+/** チャレンジ画面が fxState() に渡す材料(現在時刻の分だけは、画面が刻々と渡す)。 */
+export type FxBase = Omit<FxInput, 'nowAxis'>;
+
 interface NekaseValue {
+  /** FX チャレンジの材料。デモ表示の影響を受けず、実際の記録と設定を使う */
+  fxBase: FxBase;
+  /** 現在時刻(ミリ秒) */
+  now: () => number;
+  /** 注文する。問題があればエラーの一覧を返し、保存しない。確認ステップを済ませたら confirmed を true で渡す */
+  placeFxOrder: (order: FxOrderInput, opts: { confirmed: boolean; reason: FxReason | null }) => Promise<OrderError[]>;
   /** 読み込みが終わるまで false */
   ready: boolean;
   records: RecordRow[];
@@ -91,6 +108,7 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
 
   const [ready, setReady] = useState(false);
   const [records, setRecords] = useState<RecordRow[]>([]);
+  const [fxRows, setFxRows] = useState<FxOrderRow[]>([]);
   const [settingsRow, setSettingsRow] = useState<SettingsRow>(() => defaultSettings(0));
   const settings = useMemo<Settings>(() => toSettings(settingsRow), [settingsRow]);
   const [demo, setDemo] = useState(false);
@@ -140,8 +158,9 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
 
   useEffect(() => {
     (async () => {
-      const [recs, ts, st] = await Promise.all([s.getRecords(), s.getPendingBed(), s.getSettings()]);
+      const [recs, ts, st, fx] = await Promise.all([s.getRecords(), s.getPendingBed(), s.getSettings(), s.getFxOrders()]);
       setRecords(recs);
+      setFxRows(fx);
       if (st) setSettingsRow(st);
       // 18 時間以上たった「ねる」は破棄して、時刻入力を促す
       if (ts !== null && pendingState(ts, now()).kind === 'stale') {
@@ -166,8 +185,9 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
 
   // 他の端末の変更を取り込んだあと、端末内の保存から読み直す
   reloadRef.current = async () => {
-    const [recs, ts, st] = await Promise.all([s.getRecords(), s.getPendingBed(), s.getSettings()]);
+    const [recs, ts, st, fx] = await Promise.all([s.getRecords(), s.getPendingBed(), s.getSettings(), s.getFxOrders()]);
     setRecords(recs);
+    setFxRows(fx);
     setSettingsRow(st ?? defaultSettings(now()));
     setBedTs(ts !== null && pendingState(ts, now()).kind === 'stale' ? null : ts);
   };
@@ -271,6 +291,7 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
     await s.clear();
     setSyncStatus({ state: 'idle', lastSyncedAt: null });
     setRecords([]);
+    setFxRows([]);
     setBedTs(null);
     setSettingsRow(defaultSettings(now()));
     setNotice(null);
@@ -288,6 +309,53 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
   );
 
   const todayKey = dateKey(new Date(now()));
+  const fxBase = useMemo<FxBase>(() => {
+    const rows = records.map((r) => ({ date: r.date, ...toDayRecord(r)! }));
+    const orders: FxOrder[] = fxRows.map((r) => ({
+      date: r.date,
+      pair: r.pair,
+      side: r.side,
+      amount: r.notional,
+      entryRate: r.entry_rate,
+      stopPct: r.stop_pct as FxOrder['stopPct'],
+      gauge: r.gauge,
+      confirmReason: r.reason as FxReason | null,
+    }));
+    return { startDate: settingsRow.start_date, today: todayKey, records: simRecords(rows, settingsRow.start_date), settings, orders };
+  }, [records, fxRows, settings, settingsRow.start_date, todayKey]);
+
+  const placeFxOrder = useCallback<NekaseValue['placeFxOrder']>(
+    async (order, opts) => {
+      const t = now();
+      const st = fxState({ ...fxBase, today: dateKey(new Date(t)), nowAxis: axisNow(new Date(t)) });
+      const errors = validateOrder(order, {
+        fund: st.fund,
+        gauge: st.gauge,
+        nowAxis: axisNow(new Date(t)),
+        targetBed: fxBase.settings.targetBed,
+        targetWake: fxBase.settings.targetWake,
+        orderedToday: st.orderedToday,
+        confirmed: opts.confirmed,
+      });
+      if (st.phase !== 'active' || st.rate === null) errors.push('no_rate');
+      if (errors.length > 0) return errors;
+      const row: FxOrderRow = {
+        date: dateKey(new Date(t)),
+        pair: 'USD/JPY',
+        side: order.side,
+        notional: order.amount,
+        entry_rate: st.rate!,
+        stop_pct: order.stopPct,
+        gauge: st.gauge,
+        reason: st.needsConfirm ? opts.reason : null,
+        updated_at: t,
+      };
+      await s.putFxOrder(row);
+      setFxRows((p) => [...p.filter((x) => x.date !== row.date), row]);
+      return [];
+    },
+    [fxBase, now, s],
+  );
   const chart = useMemo<ChartData>(() => {
     if (demo) {
       return {
@@ -313,6 +381,9 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
 
   const value = useMemo<NekaseValue>(
     () => ({
+      fxBase,
+      now,
+      placeFxOrder,
       ready,
       records,
       settings,
@@ -335,7 +406,7 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
       redeemLink,
       applyLink,
     }),
-    [ready, records, settings, settingsRow, chart, saveSettings, resetAll, toggleSelf, bedTs, notice, pressBed, cancelBed, pressWake, saveSleep, now, syncStatus, startLink, redeemLink, applyLink],
+    [fxBase, placeFxOrder, ready, records, settings, settingsRow, chart, saveSettings, resetAll, toggleSelf, bedTs, notice, pressBed, cancelBed, pressWake, saveSleep, now, syncStatus, startLink, redeemLink, applyLink],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
