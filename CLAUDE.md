@@ -101,6 +101,7 @@ pnpm check                       # typecheck + lint + test をまとめて実行
   - 移植対象の関数: `simulate`、`dayStat`、`madRange`、時刻の変換(`ax`、`clock`)など
   - 定数: `OFF`、`SPAN`、`TOL`、`BASE`、`PRESETS`、`R_EQ`、`R_BD`
 - `docs/claude-code-prompts.md`: 段階ごとの依頼文(コピーして使う)
+- `docs/contributing.md`: GitHub での進め方(clone から PR まで。初心者向け)
 
 ## 触らない・注意
 
