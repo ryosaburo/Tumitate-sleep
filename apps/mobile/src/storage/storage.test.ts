@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { defaultSettings, newer, parseRecordRow, parseSettingsRow } from "./common";
-import type { RecordRow } from "./types";
+import { defaultSettings, newer, parseFxOrderRow, parseRecordRow, parseSettingsRow } from "./common";
+import type { FxOrderRow, RecordRow } from "./types";
 import { createWebStorage, memoryStore, WEB_STORAGE_KEY } from "./web";
 
 const rec = (date: string, over: Partial<RecordRow> = {}): RecordRow => ({
@@ -143,5 +143,50 @@ describe("検証と更新時刻", () => {
     expect(newer(a, b)).toBe(b);
     expect(newer(b, a)).toBe(b);
     expect(newer(a, { ...a })).toBe(a);
+  });
+});
+
+const fx = (date: string, over: Partial<FxOrderRow> = {}): FxOrderRow => ({
+  date,
+  pair: "USD/JPY",
+  side: "buy",
+  notional: 2000,
+  entry_rate: 150.4,
+  stop_pct: 1,
+  gauge: 80,
+  reason: null,
+  updated_at: 1000,
+  ...over,
+});
+
+describe("Web 実装: FX の注文", () => {
+  it("書いたものを読める。日付の昇順。同じ日付は上書き", async () => {
+    const s = createWebStorage(memoryStore());
+    await s.putFxOrder(fx("2026-10-12"));
+    await s.putFxOrder(fx("2026-10-11"));
+    await s.putFxOrder(fx("2026-10-12", { side: "sell", updated_at: 2000 }));
+    const all = await s.getFxOrders();
+    expect(all.map((r) => r.date)).toEqual(["2026-10-11", "2026-10-12"]);
+    expect(all[1]).toMatchObject({ side: "sell", updated_at: 2000 });
+  });
+  it("再読み込みしても残り、clear で消える。記録とは独立", async () => {
+    const kv = memoryStore();
+    const s = createWebStorage(kv);
+    await s.putRecord(rec("2026-10-11"));
+    await s.putFxOrder(fx("2026-10-11"));
+    expect(await createWebStorage(kv).getFxOrders()).toHaveLength(1);
+    await s.clear();
+    expect(await s.getFxOrders()).toEqual([]);
+  });
+  it("壊れた注文は捨てる", async () => {
+    const kv = memoryStore();
+    kv.setItem(WEB_STORAGE_KEY, JSON.stringify({ records: {}, settings: null, fx_orders: { a: fx("2026-10-11"), b: { date: "x" } } }));
+    expect(await createWebStorage(kv).getFxOrders()).toHaveLength(1);
+  });
+  it("検証: 損切りが 3 択以外・ゲージが範囲外は null", () => {
+    expect(parseFxOrderRow(fx("2026-10-11"))).not.toBeNull();
+    expect(parseFxOrderRow({ ...fx("2026-10-11"), stop_pct: 3 })).toBeNull();
+    expect(parseFxOrderRow({ ...fx("2026-10-11"), gauge: 101 })).toBeNull();
+    expect(parseFxOrderRow({ ...fx("2026-10-11"), notional: 0 })).toBeNull();
   });
 });

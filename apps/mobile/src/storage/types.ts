@@ -29,6 +29,28 @@ export interface SettingsRow {
 }
 
 /**
+ * FX チャレンジの注文(決済前の形)。起床日 1 日につき 1 件まで(date が主キー)。
+ * 決済の結果と資金は、レートと設定から毎回計算する(packages/core の fxState)。
+ * 計画書 §8.3 の fx_trades / fx_ledger との対応は、取引の同期を作るときに決める。
+ */
+export interface FxOrderRow {
+  /** 注文した日(起床日)'YYYY-MM-DD' */
+  date: string;
+  pair: "USD/JPY";
+  side: "buy" | "sell";
+  /** 注文額(円) */
+  notional: number;
+  entry_rate: number;
+  /** 損切り幅(%)。0.5 / 1 / 2 */
+  stop_pct: number;
+  /** 注文したときの判断力ゲージ */
+  gauge: number;
+  /** 確認ステップで選んだ理由。なければ null */
+  reason: string | null;
+  updated_at: number;
+}
+
+/**
  * 端末内保存の共通インターフェース。Web は localStorage、ネイティブは SQLite。
  * 現在時刻は呼び出し側が updated_at に入れて渡す(保存層は時計を持たない)。
  * 読み込みに失敗しても例外は投げず、空として扱って警告を出す。
@@ -47,6 +69,10 @@ export interface Storage {
   /** 「ねる」の途中状態(pending_bed_ts)。設定がなければ既定値から作って保存する */
   getPendingBed(): Promise<number | null>;
   setPendingBed(ts: number | null, now: number): Promise<void>;
+  /** 日付の昇順 */
+  getFxOrders(): Promise<FxOrderRow[]>;
+  /** 同じ日付があれば上書きする */
+  putFxOrder(row: FxOrderRow): Promise<void>;
   /** 端末内の全データを消す(設定のリセット用) */
   clear(): Promise<void>;
 }

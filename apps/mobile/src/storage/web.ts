@@ -1,5 +1,5 @@
-import { defaultSettings, parseRecordRow, parseSettingsRow, warn } from "./common";
-import type { RecordRow, SettingsRow, Storage } from "./types";
+import { defaultSettings, parseFxOrderRow, parseRecordRow, parseSettingsRow, warn } from "./common";
+import type { FxOrderRow, RecordRow, SettingsRow, Storage } from "./types";
 
 /** localStorage と同じ形の最小インターフェース(テストでは疑似のものを渡す)。 */
 export interface KeyValueStore {
@@ -13,6 +13,8 @@ export const WEB_STORAGE_KEY = "nekase.v2";
 interface Saved {
   records: Record<string, RecordRow>;
   settings: SettingsRow | null;
+  /** FX チャレンジの注文。日付がキー */
+  fx_orders: Record<string, FxOrderRow>;
 }
 
 /** ブラウザの保存が使えないときのメモリ上の代用。 */
@@ -46,7 +48,7 @@ export function createWebStorage(store?: KeyValueStore): Storage {
   }
 
   const read = (): Saved => {
-    const empty: Saved = { records: {}, settings: null };
+    const empty: Saved = { records: {}, settings: null, fx_orders: {} };
     let raw: string | null;
     try {
       raw = kv.getItem(WEB_STORAGE_KEY);
@@ -66,13 +68,20 @@ export function createWebStorage(store?: KeyValueStore): Storage {
       warn("保存データの形が違います。空として扱います");
       return empty;
     }
-    const o = obj as { records?: unknown; settings?: unknown };
-    const out: Saved = { records: {}, settings: null };
+    const o = obj as { records?: unknown; settings?: unknown; fx_orders?: unknown };
+    const out: Saved = { records: {}, settings: null, fx_orders: {} };
     if (typeof o.records === "object" && o.records !== null) {
       for (const v of Object.values(o.records)) {
         const row = parseRecordRow(v);
         if (row) out.records[row.date] = row;
         else warn("壊れた記録を 1 件捨てました", v);
+      }
+    }
+    if (typeof o.fx_orders === "object" && o.fx_orders !== null) {
+      for (const v of Object.values(o.fx_orders)) {
+        const row = parseFxOrderRow(v);
+        if (row) out.fx_orders[row.date] = row;
+        else warn("壊れた注文を 1 件捨てました", v);
       }
     }
     if (o.settings != null) {
@@ -117,6 +126,14 @@ export function createWebStorage(store?: KeyValueStore): Storage {
     async setPendingBed(ts, now) {
       const s = read();
       s.settings = { ...(s.settings ?? defaultSettings(now)), pending_bed_ts: ts, updated_at: now };
+      write(s);
+    },
+    async getFxOrders() {
+      return Object.values(read().fx_orders).sort((a, b) => a.date.localeCompare(b.date));
+    },
+    async putFxOrder(row) {
+      const s = read();
+      s.fx_orders[row.date] = row;
       write(s);
     },
     async clear() {

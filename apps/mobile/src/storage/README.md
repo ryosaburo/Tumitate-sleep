@@ -42,6 +42,7 @@ const settings = await storage.getSettings(); // なければ null
 - 各行に `updated_at`(ミリ秒)を持つ。同期のときは `newer(手元, サーバー)` で、あとから更新した方を残す。
 - 読み込みに失敗しても例外は投げない。壊れた行は捨てて、`console.warn` を出す。
 - 時刻は 20:00 起点の分(`@nekase/core` の `ax()` で変換する)。
+- FX の注文(`fx_orders`)は、決済前の形だけ保存する。決済と資金は core が毎回計算する。
 - 以前のプロトタイプの保存(`nekase.v1`)は読まない。
 
 ## テスト
