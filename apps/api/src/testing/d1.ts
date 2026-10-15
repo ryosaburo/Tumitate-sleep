@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import init from "../../migrations/0001_init.sql?raw";
 import accountTokens from "../../migrations/0002_account_tokens.sql?raw";
+import aiUsage from "../../migrations/0003_ai_usage.sql?raw";
 import type { Bindings } from "../env";
 
 /**
@@ -32,7 +33,7 @@ class Statement {
 export function createTestD1(): D1Database {
   const db = new DatabaseSync(":memory:");
   // マイグレーションを、番号の順に流す(新しいファイルを足したら、ここにも足す)
-  for (const sql of [init, accountTokens]) db.exec(sql);
+  for (const sql of [init, accountTokens, aiUsage]) db.exec(sql);
   return {
     prepare: (sql: string) => new Statement(db, sql),
     // D1 の batch と同じく、全部成功するか、全部なかったことにする
@@ -51,6 +52,18 @@ export function createTestD1(): D1Database {
   } as unknown as D1Database;
 }
 
-export function testEnv(): Bindings {
-  return { DB: createTestD1() };
+/** テスト用の Workers AI もどき。run に渡された内容を calls に残し、reply の返り値(または例外)を返す。 */
+export function createTestAi(reply: (input: unknown) => unknown | Promise<unknown> = () => ({ response: { side: "skip", comment: "" } })) {
+  const calls: { model: string; input: unknown }[] = [];
+  const ai = {
+    run: async (model: string, input: unknown) => {
+      calls.push({ model, input });
+      return reply(input);
+    },
+  } as unknown as Ai;
+  return { ai, calls };
+}
+
+export function testEnv(ai: Ai = createTestAi().ai): Bindings {
+  return { DB: createTestD1(), AI: ai };
 }

@@ -17,3 +17,8 @@ binding = "DB"
 database_name = "nekase"
 database_id = "b5701876-dbda-4703-adf0-357a28ece5b0"
 migrations_dir = "migrations"
+
+# Workers AI(FX の「AI にまかせる」。計画書 §6.6)。Workers の中からだけ呼ぶ。
+# ローカルの `wrangler dev` でも、実際の Workers AI につながる(要ログイン・利用分が課金対象になりうる)。
+[ai]
+binding = "AI"
