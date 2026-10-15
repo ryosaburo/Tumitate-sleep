@@ -18,9 +18,11 @@
   - `apps/mobile`: Expo(React Native)+ TypeScript、Expo Router、react-native-svg。Web 出力を含む
   - `apps/api`: Cloudflare Workers + Hono + Zod + D1
   - `packages/core`: 計算ロジック(積立、複利の分解、判断力ゲージ、FX の損益、判定)。**アプリと API の両方が使う**
+  - `infra/aws`: AWS CDK(TypeScript)。運営用の匿名イベントの集計(任意の学習モジュール。計画書 §8.6)
 - 端末内保存は差し替え可能な層にする(Web はブラウザ保存、ネイティブは SQLite)。
 - 睡眠データの取得は `SleepSource` インターフェース(`ButtonSleepSource` / `DemoSleepSource` / `HealthKitSleepSource`)。
 - 同期は匿名アカウント+引き継ぎコード。競合は行ごとに「あとから更新した方」(サーバー時刻)。
+- **データの正は Cloudflare(D1)の1か所だけ。** AWS には、記録・同期・引き継ぎ・FX のデータを置かない。
 
 ## コマンド
 
@@ -49,6 +51,19 @@ pnpm check                       # typecheck + lint + test をまとめて実行
 8. 日付と時刻は、端末のローカル時間で扱う。日付の文字列は `YYYY-MM-DD`(起床日)。テストでは時刻を固定する(`Date` を差し込めるようにする)。
 9. 説明やコメントは日本語。コードの識別子は英語。
 10. このチームの 2 人は開発経験が浅い。変更の理由と動かし方を、短く平易に書く。
+
+## AWS の学習モジュール(任意・最初に切る)
+
+目的は構成の学習。本体(Cloudflare)から独立していて、止まっても本体は動く。**M3 が遅れたら、これを最初に切る。**
+
+- 構成: API Gateway(HTTP API)→ Lambda(受け口)→ DynamoDB `events`(TTL 90日)。EventBridge Scheduler → Lambda(集計)→ `weekly_summary`。CloudWatch、Budgets。すべて CDK。リージョンは `ap-northeast-1`。
+- **送ってよいデータは、これだけ:** `eventId`(乱数)、`type`、`platform`(web/ios/android)、`appVersion`。サーバー時刻は受け口で付ける。
+- **送ってはいけないデータ:** アカウント ID、端末の識別子、睡眠の時刻、取引の内容(売買・金額・損益)、メールや名前。
+- `type` は許可リスト(`sleep_start`、`sleep_end`、`week_cleared`、`handover_done`、`fx_order_placed`、`fx_confirm_shown`)のみ。不明な項目は Zod で捨てる。
+- 設定に「利用状況の送信」のオン・オフを置く。送信の失敗は、画面に出さず、アプリを止めない。
+- 権限は最小にする(必要な表への必要な操作だけ)。ルートユーザーを使わない。**アクセスキー・シークレットを、リポジトリにもチャットにも貼らない。**
+- `cdk deploy` / `cdk destroy` / `cdk bootstrap` など、課金や削除を伴うコマンドは、実行前にコマンドを見せて、ユーザーの OK を待つ。
+- CORS は公開 URL のドメインだけ。API Gateway にレート制限をかける。`GET /v1/summary` はキーで保護する(キーはコードに書かない)。
 
 ## 守る仕様(要点)
 
@@ -90,5 +105,5 @@ pnpm check                       # typecheck + lint + test をまとめて実行
 ## 触らない・注意
 
 - `docs/prototype/nekase.html` は見本。編集しない。
-- `.env`、`.dev.vars`、`wrangler.toml` 内のアカウント ID などを、チャットに貼らない。
+- `.env`、`.dev.vars`、`wrangler.toml` 内のアカウント ID、AWS のアクセスキー・アカウント ID などを、チャットに貼らない。
 - D1 のスキーマを変えるときは、マイグレーションのファイルを足す(既存を書き換えない)。
