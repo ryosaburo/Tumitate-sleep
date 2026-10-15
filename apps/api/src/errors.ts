@@ -4,7 +4,7 @@ import { ZodError } from "zod";
 /** 統一したエラーの形: { error: { code, message } } */
 export class ApiError extends Error {
   constructor(
-    readonly status: 400 | 401 | 403 | 404 | 429 | 500 | 502 | 504,
+    readonly status: 400 | 401 | 403 | 404 | 429 | 500 | 502 | 503 | 504,
     readonly code: string,
     message: string,
   ) {

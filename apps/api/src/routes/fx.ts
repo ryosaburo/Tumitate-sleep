@@ -1,4 +1,4 @@
-import { AI_DAILY_LIMIT, AI_MAX_RATES, AI_TIMEOUT_MS, FX_MAX_FUND, FX_ORDER_RATIO, FX_ORDER_STEP, buildAiPrompt, normalizeAiDecision } from "@nekase/core";
+import { AI_DAILY_LIMIT, AI_GLOBAL_DAILY_LIMIT, AI_MAX_RATES, AI_TIMEOUT_MS, FX_MAX_FUND, FX_ORDER_RATIO, FX_ORDER_STEP, buildAiPrompt, normalizeAiDecision } from "@nekase/core";
 import { Hono } from "hono";
 import { z } from "zod";
 import { requireAuth } from "../auth";
@@ -29,6 +29,9 @@ const ANSWER_SCHEMA = {
   required: ["side", "amount", "stopPct", "comment"],
 };
 
+/** 全体の回数を数える行のキー(アカウント ID は UUID なので、重ならない) */
+const GLOBAL_KEY = "*";
+
 /** 日本時間の日付 'YYYY-MM-DD'。1 日の回数の数え方に使う。 */
 const jstDay = (ms: number): string => new Date(ms + 9 * 3600_000).toISOString().slice(0, 10);
 
@@ -51,15 +54,26 @@ fx.post("/ai-order", async (c) => {
   });
   const req = AiOrderRequest.parse(body);
 
-  // 1 日の回数の制限(失敗した呼び出しも数える)。上限に達していたら、AI は呼ばない。
+  // 緊急停止(費用)。止めている間は、回数も数えない。
+  if (c.env.AI_DISABLED === "1") throw new ApiError(503, "ai_disabled", "AI は、いまお休み中です。自分で注文できます。");
+
+  // 全体の 1 日の上限(無料枠を使い切らないための安全装置)。上限に達していたら、AI は呼ばない。
+  const day = jstDay(Date.now());
+  const all = await c.env.DB.prepare("SELECT n FROM ai_usage WHERE account_id = ? AND day = ?").bind(GLOBAL_KEY, day).first<{ n: number }>();
+  if ((all?.n ?? 0) >= AI_GLOBAL_DAILY_LIMIT) {
+    throw new ApiError(429, "ai_busy", "今日は、AI が混み合っています。自分で注文できます。");
+  }
+
+  // アカウントごとの 1 日の回数の制限(失敗した呼び出しも数える)。上限に達していたら、AI は呼ばない。
   const taken = await c.env.DB.prepare(
     "INSERT INTO ai_usage (account_id, day, n) VALUES (?, ?, 1) ON CONFLICT (account_id, day) DO UPDATE SET n = n + 1 WHERE n < ?",
   )
-    .bind(c.get("accountId"), jstDay(Date.now()), AI_DAILY_LIMIT)
+    .bind(c.get("accountId"), day, AI_DAILY_LIMIT)
     .run();
   if (taken.meta.changes !== 1) {
     throw new ApiError(429, "ai_limit", `AI を呼べるのは、1 日 ${AI_DAILY_LIMIT} 回までです。自分で注文できます。`);
   }
+  await c.env.DB.prepare("INSERT INTO ai_usage (account_id, day, n) VALUES (?, ?, 1) ON CONFLICT (account_id, day) DO UPDATE SET n = n + 1").bind(GLOBAL_KEY, day).run();
 
   const { system, user } = buildAiPrompt(req);
   let timer: ReturnType<typeof setTimeout> | undefined;

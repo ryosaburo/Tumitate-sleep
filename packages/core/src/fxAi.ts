@@ -4,6 +4,11 @@ import { FX_ORDER_STEP, FX_STOP_PCTS, gaugeLevel, type GaugeLevel, type Side, ty
 export const AI_COMMENT_MAX = 80;
 /** 1 アカウントが 1 日に AI を呼べる回数(失敗の再試行を含む)。 */
 export const AI_DAILY_LIMIT = 3;
+/**
+ * 全アカウント合わせた、1 日の呼び出し回数の上限。Workers AI の無料枠(1 日 10,000 ニューロン)に収めるための安全装置。
+ * 1 回 約 20 ニューロンの見積もりで、300 回 ≒ 6,000 ニューロン。
+ */
+export const AI_GLOBAL_DAILY_LIMIT = 300;
 /** AI の応答を待つ時間(ミリ秒)。超えたら注文せず、手動の注文へ案内する。 */
 export const AI_TIMEOUT_MS = 10_000;
 /** AI に渡すレートの最大本数(今日を含む直近)。 */

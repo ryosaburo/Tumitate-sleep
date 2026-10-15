@@ -4,6 +4,8 @@ export interface Bindings {
   AI: Ai;
   /** 使うモデルを入れ替えたいとき(任意)。省略すると既定のモデル */
   AI_MODEL?: string;
+  /** "1" にすると、AI を呼ばずに止める(費用の緊急停止。計画書 §6.6) */
+  AI_DISABLED?: string;
 }
 
 /** 認証を通ったあとに、ルートが使える値 */

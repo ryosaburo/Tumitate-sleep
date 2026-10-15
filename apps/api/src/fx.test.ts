@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import app from "./index";
 import { createTestAi, testEnv } from "./testing/d1";
 import type { Bindings } from "./env";
-import { AI_DAILY_LIMIT, AI_PERSONA } from "@nekase/core";
+import { AI_DAILY_LIMIT, AI_GLOBAL_DAILY_LIMIT, AI_PERSONA } from "@nekase/core";
 
 async function signup(env: Bindings) {
   const r = (await (await app.request("/v1/accounts", { method: "POST" }, env)).json()) as { accountId: string; token: string };
@@ -132,5 +132,34 @@ describe("POST /v1/fx/ai-order", () => {
     const r = await p;
     expect(r.status).toBe(504);
     expect(((await r.json()) as { error: { code: string } }).error.code).toBe("ai_timeout");
+  });
+
+  it("費用の安全装置: AI_DISABLED=1 なら AI を呼ばず、回数も数えない", async () => {
+    const t = createTestAi(ok({ side: "skip", comment: "" }));
+    const env = { ...testEnv(t.ai), AI_DISABLED: "1" };
+    const h = await signup(env);
+    for (let i = 0; i < AI_DAILY_LIMIT + 1; i++) {
+      const r = await ask(env, h);
+      expect(r.status).toBe(503);
+      expect(((await r.json()) as { error: { code: string } }).error.code).toBe("ai_disabled");
+    }
+    expect(t.calls).toHaveLength(0);
+    // 止めるのをやめたら、そのまま使える(回数は減っていない)
+    expect((await ask({ ...env, AI_DISABLED: undefined }, h)).status).toBe(200);
+  });
+
+  it(`費用の安全装置: 全アカウント合わせて 1 日 ${AI_GLOBAL_DAILY_LIMIT} 回まで`, async () => {
+    const t = createTestAi(ok({ side: "skip", comment: "" }));
+    const env = testEnv(t.ai);
+    // 全体の回数を、上限の 1 回手前まで進めておく
+    const jst = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+    await env.DB.prepare("INSERT INTO ai_usage (account_id, day, n) VALUES ('*', ?, ?)").bind(jst, AI_GLOBAL_DAILY_LIMIT - 1).run();
+    const a = await signup(env);
+    const b = await signup(env);
+    expect((await ask(env, a)).status).toBe(200);
+    const r = await ask(env, b);
+    expect(r.status).toBe(429);
+    expect(((await r.json()) as { error: { code: string } }).error.code).toBe("ai_busy");
+    expect(t.calls).toHaveLength(1);
   });
 });
