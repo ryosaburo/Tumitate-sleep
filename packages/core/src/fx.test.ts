@@ -213,6 +213,8 @@ const trade = (pnl: number | null, g = 80): FxTrade => ({
   pnl,
   gauge: g,
   confirmReason: null,
+  placedBy: "user",
+  aiComment: null,
 });
 
 describe("休む提案と振り返り", () => {

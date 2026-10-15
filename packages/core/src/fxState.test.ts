@@ -15,6 +15,8 @@ const order = (day: number, over: Partial<FxOrder> = {}): FxOrder => ({
   stopPct: 1,
   gauge: 80,
   confirmReason: null,
+  placedBy: "user",
+  aiComment: null,
   ...over,
 });
 const input = (day: number, over: Partial<FxInput> = {}): FxInput => ({
@@ -101,5 +103,25 @@ describe("チャレンジの状態", () => {
     expect(after.fund - before.fund).toBeGreaterThanOrEqual(0);
     const cleared = fxState(input(29, { records: DEMO_RECORDS })).fund;
     expect(cleared).toBeLessThanOrEqual(50000);
+  });
+});
+
+describe("AI にまかせた取引", () => {
+  it("AI の見送りの日は、注文済みと同じ扱い(注文し直せない)", () => {
+    const s = fxState(input(8, { skips: [{ date: addDays(START, 8), comment: "様子を見ます" }] }));
+    expect(s.orderedToday).toBe(true);
+    expect(s.aiSkipToday).toEqual({ comment: "様子を見ます" });
+    expect(s.trades).toEqual([]);
+    expect(fxState(input(9, { skips: [{ date: addDays(START, 8), comment: "x" }] })).orderedToday).toBe(false);
+  });
+  it("AI の取引だけの成績を、別に出す", () => {
+    const s = fxState(input(12, { orders: [order(8), order(9, { placedBy: "ai", aiComment: "飛びつきました" })] }));
+    expect(s.review.total).toBe(2);
+    expect(s.aiReview.total).toBe(1);
+    expect(s.trades[1]).toMatchObject({ placedBy: "ai", aiComment: "飛びつきました" });
+  });
+  it("AI の損益も、ユーザーの資金に入る", () => {
+    const s = fxState(input(10, { records: [], orders: [order(8, { placedBy: "ai" })] }));
+    expect(s.fund).toBe(10000 + s.trades[0]!.pnl!);
   });
 });

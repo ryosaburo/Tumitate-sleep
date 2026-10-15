@@ -223,6 +223,10 @@ export interface FxTrade {
   gauge: number;
   /** 確認ステップで選んだ理由。確認ステップがない日は null */
   confirmReason: FxReason | null;
+  /** だれが注文したか。「AI にまかせる」を選んだ日は ai(計画書 §6.6) */
+  placedBy: "user" | "ai";
+  /** AI の理由(日本語、80字まで)。AI でなければ null */
+  aiComment: string | null;
 }
 
 /** 付与。週 5 日クリアした翌週に ¥10,000、上限 ¥50,000。 */
