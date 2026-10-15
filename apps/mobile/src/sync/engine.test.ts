@@ -83,6 +83,9 @@ function fakeServer() {
       codes.set(code, c.accountId);
       return { code, expiresAt: time + 600_000 };
     },
+    async aiOrder() {
+      return { decision: { side: "skip", comment: "" } } as const;
+    },
     async linkRedeem(code) {
       check();
       const id = codes.get(code);

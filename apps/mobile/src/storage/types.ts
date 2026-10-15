@@ -37,8 +37,9 @@ export interface FxOrderRow {
   /** 注文した日(起床日)'YYYY-MM-DD' */
   date: string;
   pair: "USD/JPY";
-  side: "buy" | "sell";
-  /** 注文額(円) */
+  /** skip は、AI が「見送り」を選んだ日(注文なし。同じ日に注文し直せないよう、記録だけ残す) */
+  side: "buy" | "sell" | "skip";
+  /** 注文額(円)。skip のときは 0 */
   notional: number;
   entry_rate: number;
   /** 損切り幅(%)。0.5 / 1 / 2 */
@@ -47,6 +48,10 @@ export interface FxOrderRow {
   gauge: number;
   /** 確認ステップで選んだ理由。なければ null */
   reason: string | null;
+  /** だれが注文したか。AI にまかせた日は 'ai'(計画書 §6.6) */
+  placed_by: "user" | "ai";
+  /** AI の理由(日本語、80字まで)。AI でなければ null */
+  ai_comment: string | null;
   updated_at: number;
 }
 

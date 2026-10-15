@@ -2,6 +2,7 @@ import { FX_GRANT, FX_MAX_FUND, gaugeLevel } from '@nekase/core';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AiDelegate } from '@/components/fx/ai-delegate';
 import { OrderForm } from '@/components/fx/order-form';
 import { RateChart } from '@/components/fx/rate-chart';
 import { TradeLog } from '@/components/fx/trade-log';
@@ -96,16 +97,24 @@ export default function ChallengeScreen() {
         {fx.phase === 'active' &&
           (fx.orderedToday ? (
             <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.line }]}>
-              <ThemedText type="smallBold">今日の注文は済んでいます</ThemedText>
+              <ThemedText type="smallBold">
+                {fx.aiSkipToday ? '今日は、AI が見送りました' : fx.open?.placedBy === 'ai' ? '今日の注文は、AI が行いました' : '今日の注文は済んでいます'}
+              </ThemedText>
+              {fx.aiSkipToday && fx.aiSkipToday.comment !== '' && (
+                <ThemedText type="small">AI の理由: {fx.aiSkipToday.comment}</ThemedText>
+              )}
               <ThemedText type="small" themeColor="textSecondary">
-                注文は 1 日 1 回までです。結果は、明日の終値で決まります。
+                注文は 1 日 1 回までです。{fx.aiSkipToday ? '今日は、自分で注文し直すことはできません。' : '結果は、明日の終値で決まります。'}
               </ThemedText>
             </ThemedView>
           ) : (
-            <OrderForm fx={fx} />
+            <>
+              <OrderForm fx={fx} />
+              <AiDelegate fx={fx} />
+            </>
           ))}
 
-        <TradeLog trades={fx.trades} review={fx.review} />
+        <TradeLog trades={fx.trades} review={fx.review} aiReview={fx.aiReview} />
       </>
     );
   };

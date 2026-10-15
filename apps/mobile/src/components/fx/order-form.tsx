@@ -1,7 +1,5 @@
 import {
-  FX_CONFIRM_SECONDS,
   FX_ORDER_STEP,
-  FX_REASONS,
   FX_STOP_PCTS,
   stopLine,
   type FxReason,
@@ -10,9 +8,10 @@ import {
   type Side,
   type StopPct,
 } from '@nekase/core';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { ConfirmPanel } from '@/components/fx/confirm-panel';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -40,20 +39,11 @@ export function OrderForm({ fx }: { fx: FxState }) {
   const [amount, setAmount] = useState(FX_ORDER_STEP);
   const [stop, setStop] = useState<StopPct | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const [reason, setReason] = useState<FxReason | null>(null);
-  const [seconds, setSeconds] = useState(FX_CONFIRM_SECONDS);
   const [errors, setErrors] = useState<OrderError[]>([]);
 
   // 上限が変わったら(資金やゲージが変わったとき)、注文額を収める
   const cap = Math.max(fx.limit, 0);
   const amt = Math.min(Math.max(amount, Math.min(FX_ORDER_STEP, cap)), cap);
-
-  useEffect(() => {
-    if (!confirming) return;
-    setSeconds(FX_CONFIRM_SECONDS);
-    const id = setInterval(() => setSeconds((s) => Math.max(s - 1, 0)), 1000);
-    return () => clearInterval(id);
-  }, [confirming]);
 
   if (cap <= 0) {
     return (
@@ -67,7 +57,7 @@ export function OrderForm({ fx }: { fx: FxState }) {
   }
 
   const ready = side !== null && stop !== null;
-  const submit = async (confirmed: boolean) => {
+  const submit = async (confirmed: boolean, reason: FxReason | null = null) => {
     if (!ready) return;
     const res = await placeFxOrder({ side, amount: amt, stopPct: stop }, { confirmed, reason });
     setErrors(res);
@@ -75,7 +65,6 @@ export function OrderForm({ fx }: { fx: FxState }) {
       setConfirming(false);
       setSide(null);
       setStop(null);
-      setReason(null);
     }
   };
 
@@ -144,37 +133,12 @@ export function OrderForm({ fx }: { fx: FxState }) {
       )}
 
       {fx.needsConfirm && confirming ? (
-        <View style={styles.confirm}>
-          <ThemedText type="smallBold">いったん立ち止まりましょう</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            就寝時刻がばらついている傾向があります(目安)。注文する理由を選んでください。
-          </ThemedText>
-          <View style={styles.wrap}>
-            {FX_REASONS.map((r) => (
-              <Pressable key={r} accessibilityRole="button" accessibilityState={{ selected: reason === r }} onPress={() => setReason(r)} style={chip(reason === r)}>
-                <ThemedText type="small">{r}</ThemedText>
-              </Pressable>
-            ))}
-          </View>
-          <ThemedText type="small" themeColor="textSecondary">
-            {seconds > 0 ? `あと ${seconds} 秒、考える時間です。` : '考える時間が終わりました。'}
-          </ThemedText>
-          <View style={styles.row}>
-            <Pressable accessibilityRole="button" onPress={() => setConfirming(false)} style={[styles.chip, { borderColor: theme.line }]}>
-              <ThemedText type="smallBold">やめる</ThemedText>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ disabled: seconds > 0 || reason === null }}
-              disabled={seconds > 0 || reason === null}
-              onPress={() => submit(true)}
-              style={[styles.chip, { backgroundColor: theme.sleep, borderColor: theme.sleep }, (seconds > 0 || reason === null) && styles.disabled]}>
-              <ThemedText type="smallBold" style={{ color: theme.onSleep }}>
-                それでも注文する
-              </ThemedText>
-            </Pressable>
-          </View>
-        </View>
+        <ConfirmPanel
+          intro="就寝時刻がばらついている傾向があります(目安)。注文する理由を選んでください。"
+          confirmLabel="それでも注文する"
+          onCancel={() => setConfirming(false)}
+          onConfirm={(r) => submit(true, r)}
+        />
       ) : (
         <Pressable
           accessibilityRole="button"
@@ -200,11 +164,9 @@ export function OrderForm({ fx }: { fx: FxState }) {
 const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
   row: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' },
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   chip: { flexGrow: 1, minHeight: 44, borderWidth: 2, borderRadius: Spacing.three, paddingHorizontal: Spacing.three, alignItems: 'center', justifyContent: 'center' },
   step: { width: 44, minHeight: 44, borderWidth: 1, borderRadius: Spacing.three, alignItems: 'center', justifyContent: 'center' },
   amount: { flex: 1, alignItems: 'center' },
-  confirm: { gap: Spacing.two },
   submit: { minHeight: 48, borderRadius: Spacing.three, alignItems: 'center', justifyContent: 'center' },
   disabled: { opacity: 0.4 },
 });

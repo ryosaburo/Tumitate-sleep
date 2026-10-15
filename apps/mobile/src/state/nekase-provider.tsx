@@ -1,5 +1,8 @@
 import {
   DEMO_RECORDS,
+  FX_RATES,
+  FX_ORDER_STEP,
+  AI_MAX_RATES,
   axisNow,
   fxState,
   validateOrder,
@@ -26,7 +29,7 @@ import { AppState } from 'react-native';
 
 import { toDayRecord, toSettings } from './convert';
 import { createStorage, defaultSettings, type FxOrderRow, type RecordRow, type SettingsRow, type Storage } from '@/storage';
-import { createHttpApi, createSessionStore, createSyncEngine, type Credentials, type LinkCode, type LinkMode, type SyncEngine } from '@/sync';
+import { ApiFailure, createHttpApi, createSessionStore, createSyncEngine, type Credentials, type LinkCode, type LinkMode, type SyncEngine } from '@/sync';
 
 /** 連続した操作を、1 回の同期にまとめる待ち時間 */
 const SYNC_DELAY_MS = 1500;
@@ -53,6 +56,15 @@ export interface ChartData {
   startDate: string | null;
 }
 
+/** 「AI にまかせる」の結果(計画書 §6.6)。 */
+export type AiDelegateResult =
+  | { kind: 'ordered' }
+  | { kind: 'skipped'; comment: string }
+  /** 注文できない状態(夜間ロック、注文済み、確認ステップ未完了など) */
+  | { kind: 'blocked'; errors: OrderError[] }
+  /** AI が使えない。reason で画面の文言を分ける。注文はしていない */
+  | { kind: 'failed'; reason: 'limit' | 'network' | 'unavailable' };
+
 /** チャレンジ画面が fxState() に渡す材料(現在時刻の分だけは、画面が刻々と渡す)。 */
 export type FxBase = Omit<FxInput, 'nowAxis'>;
 
@@ -62,6 +74,8 @@ interface NekaseValue {
   /** 現在時刻(ミリ秒) */
   now: () => number;
   /** 注文する。問題があればエラーの一覧を返し、保存しない。確認ステップを済ませたら confirmed を true で渡す */
+  /** 「AI にまかせる」。AI が決めた注文を、検証したうえで確定する。失敗しても注文は作らない */
+  delegateToAi: (opts: { confirmed: boolean; reason: FxReason | null }) => Promise<AiDelegateResult>;
   placeFxOrder: (order: FxOrderInput, opts: { confirmed: boolean; reason: FxReason | null }) => Promise<OrderError[]>;
   /** 読み込みが終わるまで false */
   ready: boolean;
@@ -311,17 +325,20 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
   const todayKey = dateKey(new Date(now()));
   const fxBase = useMemo<FxBase>(() => {
     const rows = records.map((r) => ({ date: r.date, ...toDayRecord(r)! }));
-    const orders: FxOrder[] = fxRows.map((r) => ({
+    const orders: FxOrder[] = fxRows.filter((r) => r.side !== 'skip').map((r) => ({
       date: r.date,
       pair: r.pair,
-      side: r.side,
+      side: r.side as 'buy' | 'sell',
       amount: r.notional,
       entryRate: r.entry_rate,
       stopPct: r.stop_pct as FxOrder['stopPct'],
       gauge: r.gauge,
       confirmReason: r.reason as FxReason | null,
+      placedBy: r.placed_by,
+      aiComment: r.ai_comment,
     }));
-    return { startDate: settingsRow.start_date, today: todayKey, records: simRecords(rows, settingsRow.start_date), settings, orders };
+    const skips = fxRows.filter((r) => r.side === 'skip').map((r) => ({ date: r.date, comment: r.ai_comment ?? '' }));
+    return { startDate: settingsRow.start_date, today: todayKey, records: simRecords(rows, settingsRow.start_date), settings, orders, skips };
   }, [records, fxRows, settings, settingsRow.start_date, todayKey]);
 
   const placeFxOrder = useCallback<NekaseValue['placeFxOrder']>(
@@ -348,6 +365,8 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
         stop_pct: order.stopPct,
         gauge: st.gauge,
         reason: st.needsConfirm ? opts.reason : null,
+        placed_by: 'user',
+        ai_comment: null,
         updated_at: t,
       };
       await s.putFxOrder(row);
@@ -355,6 +374,62 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
       return [];
     },
     [fxBase, now, s],
+  );
+
+  const delegateToAi = useCallback<NekaseValue['delegateToAi']>(
+    async (opts) => {
+      const t = now();
+      const date = dateKey(new Date(t));
+      const nowAxis = axisNow(new Date(t));
+      const st = fxState({ ...fxBase, today: date, nowAxis });
+      const gate = (order: FxOrderInput) =>
+        validateOrder(order, {
+          fund: st.fund,
+          gauge: st.gauge,
+          nowAxis,
+          targetBed: fxBase.settings.targetBed,
+          targetWake: fxBase.settings.targetWake,
+          orderedToday: st.orderedToday,
+          confirmed: opts.confirmed,
+        });
+      // 呼ぶ前に、注文できない日(夜間・注文済み・資金なし・確認ステップ未完了)は止める。金額と損切りは、AI の答えのあとで見る
+      const before = gate({ side: 'buy', amount: FX_ORDER_STEP, stopPct: 1 }).filter((e) => e !== 'bad_amount' && e !== 'over_limit');
+      if (st.phase !== 'active' || st.rate === null || st.dayIndex === null) before.push('no_rate');
+      if (before.length > 0) return { kind: 'blocked', errors: before };
+
+      let decision;
+      try {
+        // AI に渡すのは、仮想レートの直近の動き・ゲージ・上限だけ(睡眠の時刻などは渡さない)
+        const rates = FX_RATES.slice(Math.max(0, st.dayIndex! - AI_MAX_RATES + 1), st.dayIndex! + 1);
+        decision = (await eng.requestAiOrder({ rates, gauge: st.gauge, limit: st.limit })).decision;
+      } catch (e) {
+        if (e instanceof ApiFailure && e.code === 'ai_limit') return { kind: 'failed', reason: 'limit' };
+        if (e instanceof ApiFailure && e.kind === 'network') return { kind: 'failed', reason: 'network' };
+        return { kind: 'failed', reason: 'unavailable' };
+      }
+
+      const base = { date, pair: 'USD/JPY' as const, entry_rate: st.rate!, gauge: st.gauge, placed_by: 'ai' as const, ai_comment: decision.comment || null, updated_at: t };
+      if (decision.side === 'skip') {
+        const row: FxOrderRow = { ...base, side: 'skip', notional: 0, stop_pct: 1, reason: st.needsConfirm ? opts.reason : null };
+        await s.putFxOrder(row);
+        setFxRows((p) => [...p.filter((x) => x.date !== row.date), row]);
+        return { kind: 'skipped', comment: decision.comment };
+      }
+      // AI の返答も、自分の注文と同じ検証を通す。通らなければ注文しない
+      const errors = gate({ side: decision.side, amount: decision.amount, stopPct: decision.stopPct });
+      if (errors.length > 0) return { kind: 'blocked', errors };
+      const row: FxOrderRow = {
+        ...base,
+        side: decision.side,
+        notional: decision.amount,
+        stop_pct: decision.stopPct,
+        reason: st.needsConfirm ? opts.reason : null,
+      };
+      await s.putFxOrder(row);
+      setFxRows((p) => [...p.filter((x) => x.date !== row.date), row]);
+      return { kind: 'ordered' };
+    },
+    [fxBase, now, s, eng],
   );
   const chart = useMemo<ChartData>(() => {
     if (demo) {
@@ -384,6 +459,7 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
       fxBase,
       now,
       placeFxOrder,
+      delegateToAi,
       ready,
       records,
       settings,
@@ -406,7 +482,7 @@ export function NekaseProvider({ children, now = Date.now }: { children: ReactNo
       redeemLink,
       applyLink,
     }),
-    [fxBase, placeFxOrder, ready, records, settings, settingsRow, chart, saveSettings, resetAll, toggleSelf, bedTs, notice, pressBed, cancelBed, pressWake, saveSleep, now, syncStatus, startLink, redeemLink, applyLink],
+    [fxBase, placeFxOrder, delegateToAi, ready, records, settings, settingsRow, chart, saveSettings, resetAll, toggleSelf, bedTs, notice, pressBed, cancelBed, pressWake, saveSleep, now, syncStatus, startLink, redeemLink, applyLink],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
