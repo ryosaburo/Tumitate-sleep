@@ -87,13 +87,20 @@ export function parseFxOrderRow(x: unknown): FxOrderRow | null {
   const r = x as Record<string, unknown>;
   if (typeof r.date !== "string" || !DATE_RE.test(r.date)) return null;
   if (r.pair !== "USD/JPY") return null;
-  if (r.side !== "buy" && r.side !== "sell") return null;
-  if (typeof r.notional !== "number" || !Number.isInteger(r.notional) || r.notional <= 0) return null;
+  if (r.side !== "buy" && r.side !== "sell" && r.side !== "skip") return null;
+  if (typeof r.notional !== "number" || !Number.isInteger(r.notional)) return null;
+  if (r.side === "skip" ? r.notional !== 0 : r.notional <= 0) return null;
   if (typeof r.entry_rate !== "number" || !Number.isFinite(r.entry_rate) || r.entry_rate <= 0) return null;
   if (typeof r.stop_pct !== "number" || !STOPS.includes(r.stop_pct)) return null;
   if (typeof r.gauge !== "number" || !Number.isInteger(r.gauge) || r.gauge < 0 || r.gauge > 100) return null;
   const reason = r.reason ?? null;
   if (reason !== null && typeof reason !== "string") return null;
+  // 古い保存(placed_by がない行)は、自分の注文として読む
+  const placedBy = r.placed_by ?? "user";
+  if (placedBy !== "user" && placedBy !== "ai") return null;
+  const aiComment = r.ai_comment ?? null;
+  if (aiComment !== null && (typeof aiComment !== "string" || [...aiComment].length > 200)) return null;
+  if (r.side === "skip" && placedBy !== "ai") return null;
   if (!isTime(r.updated_at)) return null;
   return {
     date: r.date,
@@ -104,6 +111,8 @@ export function parseFxOrderRow(x: unknown): FxOrderRow | null {
     stop_pct: r.stop_pct,
     gauge: r.gauge,
     reason,
+    placed_by: placedBy,
+    ai_comment: aiComment,
     updated_at: r.updated_at,
   };
 }

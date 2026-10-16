@@ -38,6 +38,14 @@ export interface LinkCode {
   expiresAt: number;
 }
 
+/** AI にまかせる注文の依頼と答え(計画書 §6.6)。送るのは、仮想レート・ゲージ・上限だけ。 */
+export interface AiOrderRequest {
+  rates: number[];
+  gauge: number;
+  limit: number;
+}
+export type { AiDecision } from "@nekase/core";
+
 /** 通信の失敗。kind で画面の文言を分ける。 */
 export class ApiFailure extends Error {
   constructor(
@@ -56,4 +64,5 @@ export interface SyncApi {
   sync(auth: Credentials, since: number, changes: Changes): Promise<SyncResponse>;
   linkStart(auth: Credentials): Promise<LinkCode>;
   linkRedeem(code: string): Promise<Credentials>;
+  aiOrder(auth: Credentials, req: AiOrderRequest): Promise<{ decision: import("@nekase/core").AiDecision }>;
 }

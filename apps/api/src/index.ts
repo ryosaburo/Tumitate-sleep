@@ -4,6 +4,7 @@ import type { AppEnv } from "./env";
 import { errorBody, handleError } from "./errors";
 import { account } from "./routes/account";
 import { accounts } from "./routes/accounts";
+import { fx } from "./routes/fx";
 import { link } from "./routes/link";
 import { sync } from "./routes/sync";
 
@@ -21,5 +22,6 @@ app.route("/v1/accounts", accounts);
 app.route("/v1/account", account);
 app.route("/v1/sync", sync);
 app.route("/v1/link", link);
+app.route("/v1/fx", fx);
 
 export default app;

@@ -1,6 +1,6 @@
 import { newer } from "../storage/common";
 import type { RecordRow, Storage } from "../storage/types";
-import { ApiFailure, type Changes, type Credentials, type LinkCode, type Session, type SessionStore, type SyncApi } from "./types";
+import { ApiFailure, type AiOrderRequest, type Changes, type Credentials, type LinkCode, type Session, type SessionStore, type SyncApi } from "./types";
 
 /** 1 回の送信で送る記録の上限(API の上限は 500 件) */
 export const CHUNK = 500;
@@ -35,6 +35,8 @@ export interface SyncEngine {
   redeemLink(code: string): Promise<Credentials>;
   /** 受け取った認証情報を反映する。overwrite は端末内データを消して取り込み、merge は両方を残して新しい方を採用 */
   applyLink(creds: Credentials, mode: LinkMode): Promise<SyncResult>;
+  /** AI に今日の注文を決めてもらう(計画書 §6.6)。アカウントがなければ先に作る。失敗は ApiFailure を投げる */
+  requestAiOrder(req: AiOrderRequest): Promise<{ decision: import("@nekase/core").AiDecision }>;
   /** この端末を、アカウントから外す(リセット用)。端末内データは消さない */
   detach(): Promise<void>;
 }
@@ -136,6 +138,10 @@ export function createSyncEngine(deps: EngineDeps): SyncEngine {
       return api.linkStart(s);
     },
     redeemLink: (code) => api.linkRedeem(code),
+    async requestAiOrder(req) {
+      const s = await ensureSession();
+      return api.aiOrder(s, req);
+    },
     async applyLink(creds, mode) {
       if (mode === "overwrite") await storage.clear();
       // since と pushedAt を 0 にして、端末内の全データを新しいアカウントに送る(merge のとき、手元の記録を残すため)
