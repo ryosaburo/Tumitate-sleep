@@ -64,6 +64,8 @@ export interface FxInput {
   records: readonly (DayRecord | null)[];
   settings: Settings;
   orders: readonly FxOrder[];
+  /** AI が「見送り」を選んだ日(注文はないが、その日は注文できない。計画書 §6.6) */
+  skips?: readonly { date: string; comment: string }[];
 }
 
 export interface FxState {
@@ -86,11 +88,15 @@ export interface FxState {
   open: FxTrade | null;
   restSuggested: boolean;
   review: FxReview;
+  /** AI にまかせた取引だけの成績 */
+  aiReview: FxReview;
+  /** 今日、AI が見送りを選んでいたら、その理由 */
+  aiSkipToday: { comment: string } | null;
 }
 
 /** チャレンジ画面に必要な状態を、まとめて計算する。画面には計算を置かない。 */
 export function fxState(input: FxInput): FxState {
-  const { startDate, today, nowAxis, records, settings, orders } = input;
+  const { startDate, today, nowAxis, records, settings, orders, skips = [] } = input;
   const dayIndex = startDate === null ? null : daysBetween(startDate, today);
   const phase: FxPhase =
     dayIndex === null || dayIndex < 0 ? "not_started" : dayIndex >= DAYS ? "ended" : "active";
@@ -125,10 +131,12 @@ export function fxState(input: FxInput): FxState {
     locked: isNightLocked(nowAxis, settings.targetBed, settings.targetWake),
     fund,
     limit: orderLimit(fund, g),
-    orderedToday: trades.some((t) => t.date === today),
+    orderedToday: trades.some((t) => t.date === today) || skips.some((k) => k.date === today),
     trades,
     open: trades.find((t) => t.pnl === null) ?? null,
     restSuggested: shouldSuggestRest(trades),
     review: reviewByGauge(trades),
+    aiReview: reviewByGauge(trades.filter((t) => t.placedBy === "ai")),
+    aiSkipToday: ((k) => (k ? { comment: k.comment } : null))(skips.find((x) => x.date === today)),
   };
 }

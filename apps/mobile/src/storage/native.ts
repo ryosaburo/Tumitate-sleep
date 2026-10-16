@@ -33,9 +33,18 @@ export function createNativeStorage(): Storage {
           pair TEXT NOT NULL, side TEXT NOT NULL,
           notional INTEGER NOT NULL, entry_rate REAL NOT NULL,
           stop_pct REAL NOT NULL, gauge INTEGER NOT NULL,
-          reason TEXT, updated_at INTEGER NOT NULL DEFAULT 0
+          reason TEXT, updated_at INTEGER NOT NULL DEFAULT 0,
+          placed_by TEXT NOT NULL DEFAULT 'user', ai_comment TEXT
         );
       `);
+      // すでにある fx_orders に、あとから足した列を足す(新しく作った表では、すでにあるので失敗するが無視する)
+      for (const col of ["placed_by TEXT NOT NULL DEFAULT 'user'", "ai_comment TEXT"]) {
+        try {
+          await d.execAsync(`ALTER TABLE fx_orders ADD COLUMN ${col}`);
+        } catch {
+          // 列がすでにある
+        }
+      }
       return d;
     })();
     return dbPromise;
@@ -127,9 +136,9 @@ export function createNativeStorage(): Storage {
         await db()
       ).runAsync(
         `INSERT OR REPLACE INTO fx_orders
-          (date, pair, side, notional, entry_rate, stop_pct, gauge, reason, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [r.date, r.pair, r.side, r.notional, r.entry_rate, r.stop_pct, r.gauge, r.reason, r.updated_at],
+          (date, pair, side, notional, entry_rate, stop_pct, gauge, reason, placed_by, ai_comment, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [r.date, r.pair, r.side, r.notional, r.entry_rate, r.stop_pct, r.gauge, r.reason, r.placed_by, r.ai_comment, r.updated_at],
       );
     },
     async clear() {

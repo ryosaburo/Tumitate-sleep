@@ -155,6 +155,8 @@ const fx = (date: string, over: Partial<FxOrderRow> = {}): FxOrderRow => ({
   stop_pct: 1,
   gauge: 80,
   reason: null,
+  placed_by: "user",
+  ai_comment: null,
   updated_at: 1000,
   ...over,
 });
@@ -188,5 +190,23 @@ describe("Web 実装: FX の注文", () => {
     expect(parseFxOrderRow({ ...fx("2026-10-11"), stop_pct: 3 })).toBeNull();
     expect(parseFxOrderRow({ ...fx("2026-10-11"), gauge: 101 })).toBeNull();
     expect(parseFxOrderRow({ ...fx("2026-10-11"), notional: 0 })).toBeNull();
+  });
+  it("古い保存(placed_by なし)は、自分の注文として読む", () => {
+    const old: Record<string, unknown> = { ...fx("2026-10-11") };
+    delete old.placed_by;
+    delete old.ai_comment;
+    expect(parseFxOrderRow(old)).toMatchObject({ placed_by: "user", ai_comment: null });
+  });
+  it("AI の見送り(skip)は、金額 0・AI の注文のときだけ有効", () => {
+    const skip = fx("2026-10-11", { side: "skip", notional: 0, placed_by: "ai", ai_comment: "様子を見ます" });
+    expect(parseFxOrderRow(skip)).not.toBeNull();
+    expect(parseFxOrderRow({ ...skip, notional: 1000 })).toBeNull();
+    expect(parseFxOrderRow({ ...skip, placed_by: "user" })).toBeNull();
+    expect(parseFxOrderRow({ ...skip, placed_by: "x" })).toBeNull();
+  });
+  it("AI の注文を保存して読める", async () => {
+    const s = createWebStorage(memoryStore());
+    await s.putFxOrder(fx("2026-10-11", { placed_by: "ai", ai_comment: "飛びつきました" }));
+    expect((await s.getFxOrders())[0]).toMatchObject({ placed_by: "ai", ai_comment: "飛びつきました" });
   });
 });

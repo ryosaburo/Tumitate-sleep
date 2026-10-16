@@ -1,4 +1,4 @@
-import { ApiFailure, type Changes, type Credentials, type LinkCode, type SyncApi, type SyncResponse } from "./types";
+import { ApiFailure, type AiOrderRequest, type Changes, type Credentials, type LinkCode, type SyncApi, type SyncResponse } from "./types";
 
 /**
  * fetch で API を呼ぶ実装。baseUrl が空なら同じオリジン(本番の Web 版)。
@@ -38,5 +38,6 @@ export function createHttpApi(baseUrl: string, fetchImpl: typeof fetch = fetch):
       call<SyncResponse>("/v1/sync", { auth, body: { since, changes } }),
     linkStart: (auth: Credentials): Promise<LinkCode> => call<LinkCode>("/v1/link/start", { auth }),
     linkRedeem: (code: string): Promise<Credentials> => call<Credentials>("/v1/link/redeem", { body: { code } }),
+    aiOrder: (auth: Credentials, req: AiOrderRequest) => call<{ decision: import("@nekase/core").AiDecision }>("/v1/fx/ai-order", { auth, body: req }),
   };
 }
