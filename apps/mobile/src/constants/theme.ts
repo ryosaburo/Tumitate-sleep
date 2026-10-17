@@ -91,4 +91,6 @@ export const Spacing = {
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+/** Web では、タブバーが画面上部に浮いている(position: absolute)ので、その高さぶんだけ本文を下げる。 */
+export const WebTopInset = Platform.OS === 'web' ? 72 : 0;
 export const MaxContentWidth = 800;
