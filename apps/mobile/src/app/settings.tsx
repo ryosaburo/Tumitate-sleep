@@ -1,5 +1,6 @@
 import { clock, normalizeStartDate, normalizeTime, PRESETS, toggleTask, type PresetKey, type TaskKey } from '@nekase/core';
-import { useEffect, useState } from 'react';
+import { Link } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -28,6 +29,23 @@ export default function SettingsScreen() {
   const [taskMessage, setTaskMessage] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [allocationGuideOpen, setAllocationGuideOpen] = useState(false);
+  const [usageGuideOpen, setUsageGuideOpen] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const allocationY = useRef<number | null>(null);
+  const allocationScrollPending = useRef(false);
+
+  const scrollToAllocation = () => {
+    if (!allocationScrollPending.current || allocationY.current === null || !scrollRef.current) return;
+    scrollRef.current.scrollTo({ y: Math.max(0, allocationY.current - WebTopInset - Spacing.two), animated: true });
+    allocationScrollPending.current = false;
+  };
+
+  const openAllocationGuide = () => {
+    allocationScrollPending.current = true;
+    setAllocationGuideOpen(true);
+    // すでに開いていれば、そのまま移動する。閉じていれば、展開後のレイアウト更新を待つ。
+    if (allocationGuideOpen) scrollToAllocation();
+  };
 
   // 保存データの読み込みが終わったら、入力欄に反映する
   useEffect(() => {
@@ -56,12 +74,80 @@ export default function SettingsScreen() {
 
   const input = [styles.input, { borderColor: theme.line, color: theme.text, backgroundColor: theme.background }];
   const card = [styles.card, { borderColor: theme.line }];
+  const guideLink = [styles.underline, { color: theme.sleepInk }];
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scroll}>
-          <ThemedText type="subtitle">設定</ThemedText>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} onContentSizeChange={scrollToAllocation}>
+          <View style={styles.allocationHeader}>
+            <ThemedText type="subtitle" style={styles.allocationTitle}>設定</ThemedText>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={usageGuideOpen ? '設定画面の使い方を閉じる' : '設定画面の使い方を見る'}
+              accessibilityState={{ expanded: usageGuideOpen }}
+              onPress={() => setUsageGuideOpen((open) => !open)}
+              style={styles.allocationGuideButton}>
+              <ThemedText type="small" themeColor="sleepInk" style={styles.underline}>
+                {usageGuideOpen ? '閉じる' : '使い方を見る'}
+              </ThemedText>
+            </Pressable>
+          </View>
+          {usageGuideOpen && (
+            <ThemedView type="backgroundElement" style={[card, styles.usageGuide]}>
+              <View style={styles.allocationGuideSection}>
+                <ThemedText type="smallBold">目標時刻</ThemedText>
+                <ThemedText type="small">
+                  毎日の目標となる就寝時刻と起床時刻を設定します。設定した時間をもとに、
+                  <Link href="/review" accessibilityRole="link" accessibilityLabel="達成状況を振り返り画面で見る" style={guideLink}>達成状況</Link>
+                  を確認できます。
+                </ThemedText>
+              </View>
+              <View style={styles.allocationGuideSection}>
+                <ThemedText type="smallBold">開始日</ThemedText>
+                <ThemedText type="small">
+                  <Link href={{ pathname: '/', params: { section: 'graph' } }} accessibilityRole="link" accessibilityLabel="睡眠習慣の記録をホーム画面で見る" style={guideLink}>睡眠習慣の記録</Link>
+                  と
+                  <Link href={{ pathname: '/', params: { section: 'graph' } }} accessibilityRole="link" accessibilityLabel="仮想積立をホーム画面で見る" style={guideLink}>仮想積立</Link>
+                  のシミュレーションを始める日を設定します。
+                </ThemedText>
+                <ThemedText type="small">
+                  開始日を設定すると、
+                  <Link href={{ pathname: '/', params: { section: 'graph' } }} accessibilityRole="link" accessibilityLabel="睡眠習慣の記録をホーム画面で見る" style={guideLink}>睡眠習慣の記録</Link>
+                  や
+                  <Link href={{ pathname: '/', params: { section: 'graph' } }} accessibilityRole="link" accessibilityLabel="仮想積立をホーム画面で見る" style={guideLink}>仮想積立</Link>
+                  の変化を確認できます。
+                </ThemedText>
+                <ThemedText type="small">
+                  また、開始日を設定して保存すると、開始日以降に
+                  <Link href="/challenge" accessibilityRole="link" accessibilityLabel="チャレンジ機能の画面を開く" style={guideLink}>チャレンジ機能</Link>
+                  を利用できます。
+                </ThemedText>
+                <ThemedText type="small">新しい注文ができる期間は開始日から30日間で、夜間など利用できない時間帯もあります。</ThemedText>
+              </View>
+              <View style={styles.allocationGuideSection}>
+                <ThemedText type="smallBold">行動課題</ThemedText>
+                <ThemedText type="small">睡眠習慣を改善するために、毎日取り組む課題を選びます。</ThemedText>
+                <ThemedText type="small">課題を達成すると、仮想のお金を積み立てられます。</ThemedText>
+              </View>
+              <View style={styles.allocationGuideSection}>
+                <ThemedText type="smallBold">積立の配分</ThemedText>
+                <ThemedText type="small">積み立てた仮想のお金を、世界株式・債券・現金に振り分ける割合を選びます。</ThemedText>
+                <ThemedText type="small">「守り重視」「バランス」「成長重視」の3種類から選択できます。</ThemedText>
+                <ThemedText type="small">
+                  それぞれの違いは、積立の配分の「
+                  <ThemedText
+                    type="small"
+                    accessibilityRole="button"
+                    accessibilityLabel="積立の配分の説明を開いて移動する"
+                    accessibilityState={{ expanded: allocationGuideOpen }}
+                    onPress={openAllocationGuide}
+                    style={guideLink}>詳しく見る</ThemedText>
+                  」から確認できます。
+                </ThemedText>
+              </View>
+            </ThemedView>
+          )}
           {message && (
             <ThemedText type="small" style={{ color: message.startsWith('✓') ? theme.goodInk : theme.assetInk }}>
               {message}
@@ -119,7 +205,12 @@ export default function SettingsScreen() {
             )}
           </ThemedView>
 
-          <ThemedView type="backgroundElement" style={card}>
+          <ThemedView
+            type="backgroundElement"
+            style={card}
+            onLayout={(event) => {
+              allocationY.current = event.nativeEvent.layout.y;
+            }}>
             <View style={styles.allocationHeader}>
               <ThemedText type="smallBold" style={styles.allocationTitle}>積立の配分(世界株式 / 債券 / 現金)</ThemedText>
               <Pressable
@@ -248,6 +339,7 @@ const styles = StyleSheet.create({
   allocationGuideButton: { minHeight: 44, flexShrink: 0, justifyContent: 'center', paddingHorizontal: Spacing.one },
   allocationGuide: { gap: Spacing.three, paddingVertical: Spacing.two },
   allocationGuideSection: { gap: Spacing.one },
+  usageGuide: { gap: Spacing.three },
   row: { flexDirection: 'row', gap: Spacing.three },
   field: { flex: 1, gap: Spacing.one },
   input: { minHeight: 48, borderWidth: 1, borderRadius: Spacing.two, paddingHorizontal: Spacing.three, fontSize: 16 },
