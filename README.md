@@ -149,6 +149,15 @@ git pull
 pnpm install             # 依存が変わっていることがあるので、毎回やっておく
 ```
 
+**デプロイの前に、必ずブランチと最新かを確認します。** 古いブランチのままデプロイすると、反映したはずの変更が公開されません(「作成中です」の画面が残った、という実例があります)。
+
+```sh
+git branch --show-current                        # main と表示されること。別のブランチ名なら、git checkout main からやり直す
+git status --short                               # 何も表示されないこと(未コミットの変更があると、それも公開される)
+git fetch && git log --oneline HEAD..origin/main # 何も表示されないこと(表示されたら、まだ pull していない)
+git log --oneline -3                             # 先頭が、マージした Pull Request のコミットであること
+```
+
 **② 公開前の確認(1 分)**
 
 ```sh
@@ -192,7 +201,7 @@ curl -X POST https://nekase.<サブドメイン>.workers.dev/v1/accounts   # {"a
 | --- | --- |
 | `pnpm run deploy` が途中で失敗する | 最初の `build:web`(画面の書き出し)か、`wrangler deploy` か、どちらで止まったかを見る。エラーの全文を残す |
 | 画面は新しいが、API がエラーになる | ③ を忘れていないか(`migrations list` で確認) |
-| 反映したのに、画面が古い | 強く再読み込み。それでも古いなら、`apps/mobile/dist` が更新されたか(`pnpm build:web` を単独で実行)を見る |
+| 反映したのに、画面が古い | まず `git branch --show-current` が `main` か、`git log` に今回のコミットがあるかを確認。そのうえで、強く再読み込み。それでも古いなら、`apps/mobile/dist` が更新されたか(`pnpm build:web` を単独で実行)を見る |
 | 公開した内容を戻したい | Cloudflare のダッシュボード → Workers & Pages → `nekase` → Deployments から、前のバージョンに戻せる(D1 のマイグレーションは戻らない) |
 | ログを見たい | `cd apps/api && pnpm exec wrangler tail`(リアルタイムのログ。止めるときは `Ctrl + C`) |
 
