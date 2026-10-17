@@ -130,13 +130,77 @@ cd ../..
 pnpm run deploy                                             # ④ Web 版を書き出し、Worker をデプロイ
 ```
 
-2 回目以降(コードや画面を変えたあと)は、④だけです。マイグレーションを足したときは、③も行います。
-
 - ④ の最後に、公開 URL(`https://nekase.<サブドメイン>.workers.dev`)が表示されます。
 - **`pnpm deploy` ではなく `pnpm run deploy`** と書きます(`pnpm deploy` は、pnpm 自身の別のコマンドです)。
-- 公開後の確認: URL を開いて画面が出ること、`curl -X POST <URL>/v1/accounts` が `accountId` と `token` を返すことを見ます。
-- `wrangler.toml` の `database_id` は、いまは仮の値(ゼロ埋め)です。本物の ID や、Cloudflare のアカウント ID は、**チャットや Pull Request に貼りません。**
+- `wrangler.toml` の `database_id` は、自分の D1 の値です。Cloudflare のアカウント ID と合わせて、**チャットや Pull Request に貼りません。**
 - 設定を変えるのは `apps/api/wrangler.toml` です。画面の書き出し先(`apps/mobile/dist`)は Git に入りません。
+
+### 再デプロイする(2 回目以降)
+
+コードや画面を変えたあとに、公開 URL へ反映する手順です。初回の ①② は、もう済んでいるので要りません。
+
+**① 反映したい内容を、手元に持ってくる**
+
+デプロイは「いま手元にあるコード」を公開します。Pull Request をマージしたあと、手元を最新にしてから行います。
+
+```sh
+git checkout main        # 公開する内容を入れたブランチ(チームで決めたもの)。dev でも main でもよい
+git pull
+pnpm install             # 依存が変わっていることがあるので、毎回やっておく
+```
+
+**② 公開前の確認(1 分)**
+
+```sh
+pnpm check               # 型チェック + lint + テスト。落ちたら、デプロイしない
+```
+
+**③ 本番の D1 にマイグレーションを反映する(`apps/api/migrations/` に新しいファイルがあるときだけ)**
+
+```sh
+cd apps/api
+pnpm exec wrangler d1 migrations list nekase --remote    # まだ反映していないファイルが表示される(「No migrations to apply」なら、何もしなくてよい)
+pnpm exec wrangler d1 migrations apply nekase --remote   # 反映する(Y/N を聞かれたら、内容を見て Y)
+cd ../..
+```
+
+- **先に ③、あとに ④** の順です。新しいコードが、まだない表を使うと、API がエラーになります。
+- マイグレーションは足すだけで、書き換えません。反映したものは、取り消せません。
+
+**④ デプロイする**
+
+```sh
+pnpm run deploy          # Web 版を書き出して、Worker をデプロイする(1 〜 2 分)
+```
+
+- ログインが切れていたら `cd apps/api && pnpm exec wrangler login` をしてから、もう一度行います。
+- 最後に公開 URL が表示されます。
+
+**⑤ 公開後の確認**
+
+```sh
+curl https://nekase.<サブドメイン>.workers.dev/health                # {"ok":true}
+curl -X POST https://nekase.<サブドメイン>.workers.dev/v1/accounts   # {"accountId":"...","token":"..."}
+```
+
+- ブラウザで URL を開き、**強く再読み込み**(Mac: `Cmd + Shift + R`)して、変えた画面が出ることを見ます。古い画面が出るときは、ブラウザのキャッシュです。
+- 「ねる」「おきた」を押して、同期のエラーが出ないことも見ます。
+
+**うまくいかないとき**
+
+| 症状 | 見るところ |
+| --- | --- |
+| `pnpm run deploy` が途中で失敗する | 最初の `build:web`(画面の書き出し)か、`wrangler deploy` か、どちらで止まったかを見る。エラーの全文を残す |
+| 画面は新しいが、API がエラーになる | ③ を忘れていないか(`migrations list` で確認) |
+| 反映したのに、画面が古い | 強く再読み込み。それでも古いなら、`apps/mobile/dist` が更新されたか(`pnpm build:web` を単独で実行)を見る |
+| 公開した内容を戻したい | Cloudflare のダッシュボード → Workers & Pages → `nekase` → Deployments から、前のバージョンに戻せる(D1 のマイグレーションは戻らない) |
+| ログを見たい | `cd apps/api && pnpm exec wrangler tail`(リアルタイムのログ。止めるときは `Ctrl + C`) |
+
+**AI(「AI にまかせる」)について**
+
+- Workers AI は `wrangler.toml` の `[ai]` で有効です。無料プランのままなら、無料枠を超えた分は課金ではなくエラーになります(費用の方針は計画書 §6.6)。
+- **緊急で止めたいとき:** `wrangler.toml` に `[vars]` と `AI_DISABLED = "1"` を足して、④ を行います。AI を呼ばなくなります。
+- 使用量は、Cloudflare のダッシュボード(Workers AI の利用状況)で見られます。
 
 ## ドキュメント
 
