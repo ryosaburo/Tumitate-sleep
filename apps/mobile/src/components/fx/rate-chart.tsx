@@ -1,7 +1,8 @@
-import { FX_RATES, daysBetween, type FxTrade } from '@nekase/core';
+import { FX_RATES, daysBetween, rateChange, type FxTrade, type RateDirection } from '@nekase/core';
 import { View } from 'react-native';
-import Svg, { Line, Polygon, Polyline, Text as SvgText } from 'react-native-svg';
+import Svg, { Line, Polygon, Text as SvgText } from 'react-native-svg';
 
+import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 
 const W = 320;
@@ -23,16 +24,23 @@ interface Props {
 export function RateChart({ startDate, dayIndex, trades }: Props) {
   const c = useTheme();
   const last = Math.min(dayIndex, FX_RATES.length - 1);
-  const pts = FX_RATES.slice(0, last + 1)
-    .map((r, i) => `${x(i)},${y(r)}`)
-    .join(' ');
+  const change = rateChange(FX_RATES, last);
+  const color: Record<RateDirection, string> = { up: c.rateUp, down: c.rateDown, flat: c.textSecondary };
+  // 前日と比べて、1 日ごとに線を分ける。色だけに頼らず、下降は破線にする
+  const segs = Array.from({ length: last }, (_, k) => {
+    const i = k + 1;
+    const dir = rateChange(FX_RATES, i)!.dir;
+    return { i, dir, x1: x(i - 1), y1: y(FX_RATES[i - 1]!), x2: x(i), y2: y(FX_RATES[i]!) };
+  });
   const ticks = [LO + 1, Math.round((LO + HI) / 2), HI - 1];
 
   return (
     <View
       accessible
-      accessibilityLabel={`仮想の USD/JPY の日足。今日は ${FX_RATES[last]!.toFixed(2)} 円。取引した日には、買いは上向き、売りは下向きの三角を付けています。`}
-      style={{ width: '100%', maxWidth: 560, aspectRatio: W / H }}>
+      accessibilityLabel={`仮想の USD/JPY の日足。今日は ${FX_RATES[last]!.toFixed(2)} 円。${trendText(change)}上昇した日は青の実線、下降した日は赤の破線です。取引した日には、買いは上向き、売りは下向きの三角を付けています。`}
+      style={{ width: '100%', maxWidth: 560, gap: 6 }}>
+      <TrendBadge change={change} />
+      <View style={{ width: '100%', aspectRatio: W / H }}>
       <Svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`}>
         {ticks.map((t) => (
           <Line key={t} x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke={c.line} strokeWidth={1} />
@@ -48,7 +56,19 @@ export function RateChart({ startDate, dayIndex, trades }: Props) {
         <SvgText x={W - PAD.r} y={H - 5} fontSize={10} fill={c.textSecondary} textAnchor="end">
           30日目
         </SvgText>
-        <Polyline points={pts} fill="none" stroke={c.sleep} strokeWidth={2} />
+        {segs.map((g) => (
+          <Line
+            key={g.i}
+            x1={g.x1}
+            y1={g.y1}
+            x2={g.x2}
+            y2={g.y2}
+            stroke={color[g.dir]}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeDasharray={g.dir === 'down' ? '5 3' : undefined}
+          />
+        ))}
         {trades.map((t) => {
           const i = daysBetween(startDate, t.date);
           if (i < 0 || i > last) return null;
@@ -62,6 +82,44 @@ export function RateChart({ startDate, dayIndex, trades }: Props) {
         })}
         <Line x1={x(last)} x2={x(last)} y1={PAD.t} y2={H - PAD.b} stroke={c.sleepInk} strokeWidth={1} strokeDasharray="3 3" />
       </Svg>
+      </View>
+      <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
+        <ThemedText type="small" style={{ color: c.rateUp }}>
+          ━ 上昇(青・実線)
+        </ThemedText>
+        <ThemedText type="small" style={{ color: c.rateDown }}>
+          ╌ 下降(赤・破線)
+        </ThemedText>
+      </View>
     </View>
+  );
+}
+
+const ARROW: Record<RateDirection, string> = { up: '▲', down: '▼', flat: '―' };
+const WORD: Record<RateDirection, string> = { up: '上昇', down: '下降', flat: '変わらず' };
+
+function trendText(ch: ReturnType<typeof rateChange>): string {
+  if (!ch) return '前日がないため、前日比はありません。';
+  return `前日比 ${WORD[ch.dir]} ${ch.diff >= 0 ? '+' : ''}${ch.diff.toFixed(2)} 円。`;
+}
+
+/** 今日の終値の前日比。色に加えて、矢印と言葉でも示す。 */
+function TrendBadge({ change }: { change: ReturnType<typeof rateChange> }) {
+  const c = useTheme();
+  if (!change) {
+    return (
+      <ThemedText type="small" themeColor="textSecondary">
+        前日比: 1 日目のため、まだありません
+      </ThemedText>
+    );
+  }
+  const col = change.dir === 'up' ? c.rateUp : change.dir === 'down' ? c.rateDown : c.textSecondary;
+  const sign = change.diff > 0 ? '+' : change.diff < 0 ? '−' : '';
+  return (
+    <ThemedText type="smallBold" style={{ color: col }}>
+      {ARROW[change.dir]} 前日比 {sign}
+      {Math.abs(change.diff).toFixed(2)} 円({sign}
+      {Math.abs(change.pct).toFixed(2)}%)・{WORD[change.dir]}
+    </ThemedText>
   );
 }

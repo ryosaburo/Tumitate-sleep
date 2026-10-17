@@ -13,5 +13,6 @@ export * from "./settingsEdit";
 export * from "./chartData";
 export * from "./fixtures";
 export * from "./fx";
+export * from "./rateTrend";
 export * from "./fxState";
 export * from "./fxAi";

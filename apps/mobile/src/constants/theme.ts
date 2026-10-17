@@ -29,6 +29,9 @@ export const Colors = {
     goodInk: '#12643F',
     goodSoft: '#D6EFE2',
     onGood: '#FFFFFF',
+    /** レートの上昇(青)・下降(赤)。赤は落ち着いた色にし、点滅や強調はしない */
+    rateUp: '#1F6FC4',
+    rateDown: '#B5443A',
   },
   dark: {
     text: '#ECEEFB',
@@ -50,6 +53,8 @@ export const Colors = {
     goodInk: '#7BE3B2',
     goodSoft: '#173A2E',
     onGood: '#0D1024',
+    rateUp: '#7DB4FF',
+    rateDown: '#E8928A',
   },
 } as const;
 
