@@ -8,7 +8,7 @@ import { ChartSection } from '@/components/chart/chart-section';
 import { SleepBar } from '@/components/sleep-bar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Spacing, WebTopInset } from '@/constants/theme';
 import { useNekase } from '@/state/nekase-provider';
 
 export default function HomeScreen() {
@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: MaxContentWidth,
   },
-  scroll: { padding: Spacing.four, gap: Spacing.two, paddingBottom: BottomTabInset + 160 },
+  scroll: { padding: Spacing.four, paddingTop: Spacing.four + WebTopInset, gap: Spacing.two, paddingBottom: BottomTabInset + 160 },
   link: { minHeight: 44, justifyContent: 'center' },
   underline: { textDecorationLine: 'underline' },
 });
