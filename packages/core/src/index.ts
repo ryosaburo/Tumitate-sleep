@@ -6,6 +6,7 @@ export * from "./achievement";
 export * from "./simulate";
 export * from "./weekly";
 export * from "./reveal";
+export * from "./monthSummary";
 export * from "./sleepButton";
 export * from "./sleepEdit";
 export * from "./settingsEdit";

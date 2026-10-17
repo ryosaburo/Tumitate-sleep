@@ -1,4 +1,4 @@
-import { DAYS, WEEK_GOAL, madRange, reveal, weeklySummary } from '@nekase/core';
+import { DAYS, WEEK_GOAL, madRange, monthSummary, reveal, weeklySummary } from '@nekase/core';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +20,7 @@ export default function ReviewScreen() {
   const { ready, chart, setDemo } = useNekase();
   const { sim, records, settings, elapsed, demo } = chart;
 
+  const summary = monthSummary(records, sim, settings.targetBed, elapsed);
   const weeks = elapsed > 0 ? weeklySummary(records, sim, settings.targetBed, elapsed) : [];
   const done = elapsed >= DAYS;
   const rv = done ? reveal(sim, settings.preset) : null;
@@ -49,6 +50,21 @@ export default function ReviewScreen() {
                 <ThemedText type="small" themeColor="textSecondary">
                   デモデータを表示中です(保存されません)。
                 </ThemedText>
+              )}
+
+              {summary && (
+                <ThemedView type="backgroundElement" style={card}>
+                  <ThemedText type="smallBold">{summary.days >= DAYS ? 'この30日のまとめ' : `ここまで ${summary.days} 日のまとめ`}</ThemedText>
+                  {summary.lines.map((line) => (
+                    <ThemedText key={line} type="small">
+                      {line}
+                    </ThemedText>
+                  ))}
+                  <ThemedText type="small" themeColor="textSecondary">
+                    記録 {summary.recorded} / {summary.days} 日 ・ クリア {summary.clearDays} 日 ・ 達成した週 {summary.achievedWeeks} / {summary.weekCount} ・
+                    積立元本 {yen(summary.principal)} → 評価額 {yen(summary.value)}
+                  </ThemedText>
+                </ThemedView>
               )}
 
               <ThemedText type="smallBold">週ごとの振り返り</ThemedText>

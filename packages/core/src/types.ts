@@ -82,3 +82,29 @@ export interface WeekSummary {
   /** 週末(to の日)の評価額 */
   endValue: number;
 }
+
+/** 就寝のズレの変化。10 分以上の差があるときだけ、変化とみなす。 */
+export type BedTrend = "improved" | "steady" | "wider";
+
+/** 振り返り画面の「この30日のまとめ」の材料。 */
+export interface MonthSummary {
+  /** 対象の日数(経過日数。最大 30) */
+  days: number;
+  /** 就寝か起床のどちらかを記録した日数 */
+  recorded: number;
+  clearDays: number;
+  /** 達成した週の数 / 週の数(最後の週は途中まで) */
+  achievedWeeks: number;
+  weekCount: number;
+  /** 初週と直近 7 日の就寝のズレ(分)。3 日未満の記録、または 14 日未満の期間は null */
+  madFirst: number | null;
+  madRecent: number | null;
+  trend: BedTrend | null;
+  /** 平均の就寝・起床の時刻(20:00 起点の分)。記録が 3 日未満なら null */
+  avgBed: number | null;
+  avgWake: number | null;
+  principal: number;
+  value: number;
+  /** 画面に出す文章(2〜3 行) */
+  lines: string[];
+}
