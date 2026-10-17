@@ -31,6 +31,7 @@ export function LinkCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   /** コードが通ったあと、「上書き / 統合」の確認を待っている認証情報 */
   const [pending, setPending] = useState<Credentials | null>(null);
 
@@ -98,7 +99,56 @@ export function LinkCard() {
 
   return (
     <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.line }]}>
-      <ThemedText type="smallBold">ほかの端末に引き継ぐ</ThemedText>
+      <View style={styles.heading}>
+        <ThemedText type="smallBold" style={styles.headingTitle}>ほかの端末に引き継ぐ</ThemedText>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={guideOpen ? '端末引き継ぎの説明を閉じる' : '端末引き継ぎの説明を詳しく見る'}
+          accessibilityState={{ expanded: guideOpen }}
+          onPress={() => setGuideOpen((open) => !open)}
+          style={styles.guideButton}>
+          <ThemedText type="small" themeColor="sleepInk" style={styles.underline}>
+            {guideOpen ? '閉じる' : '詳しく見る'}
+          </ThemedText>
+        </Pressable>
+      </View>
+      {guideOpen && (
+        <View style={styles.guide}>
+          <View style={styles.guideSection}>
+            <ThemedText type="smallBold">ほかの端末への引き継ぎとは？</ThemedText>
+            <ThemedText type="small">睡眠記録や設定を、別の端末でも利用できるようにする機能です。引き継ぎ後も元の端末を利用できます。</ThemedText>
+          </View>
+          <View style={styles.guideSection}>
+            <ThemedText type="smallBold">引き継ぎ方法</ThemedText>
+            <ThemedText type="small">1. 元の端末で同期状況を確認し、コードを発行します。</ThemedText>
+            <ThemedText type="small">2. 新しい端末でコードを入力します。</ThemedText>
+            <ThemedText type="small">3. 睡眠記録がある場合は「統合」または「上書き」を選択します。</ThemedText>
+            <ThemedText type="small">4. 引き継ぎ後、記録や設定が反映されていることを確認します。</ThemedText>
+          </View>
+          <View style={styles.guideSection}>
+            <ThemedText type="smallBold">統合と上書きの違い</ThemedText>
+            <ThemedText type="smallBold">統合：</ThemedText>
+            <ThemedText type="small">両方の端末の睡眠記録をまとめます。同じ日付の記録は更新時刻が新しいものを優先します。設定は更新時刻が新しい方の設定一式を採用します。</ThemedText>
+            <ThemedText type="smallBold">上書き：</ThemedText>
+            <ThemedText type="small">引き継ぎ先のデータを削除して、元のアカウントの記録や設定を取り込みます。</ThemedText>
+          </View>
+          <View style={[styles.warning, { borderColor: theme.assetInk }]}>
+            <ThemedText type="smallBold" themeColor="assetInk">注意：</ThemedText>
+            <ThemedText type="smallBold" themeColor="assetInk">上書きすると、引き継ぎ先のFX注文も削除されます。</ThemedText>
+            <ThemedText type="smallBold" themeColor="assetInk">睡眠記録がない端末では、自動的に上書きされます。設定やFX注文だけがある場合も注意が必要です。</ThemedText>
+          </View>
+          <View style={styles.guideSection}>
+            <ThemedText type="smallBold">引き継ぎコードについて</ThemedText>
+            <ThemedText type="small">コードは英数字8文字で、有効期限は発行から10分間です。使用できるのは1回だけで、新しいコードを発行すると古いコードは無効になります。</ThemedText>
+            <ThemedText type="small">コードの確認後に操作を中止した場合も、元の端末で再発行が必要です。</ThemedText>
+            <ThemedText type="small">コードの発行・入力・同期にはインターネット接続が必要です。コードは引き継ぐ相手以外に共有しないでください。</ThemedText>
+          </View>
+          <View style={styles.guideSection}>
+            <ThemedText type="smallBold">FX取引記録について</ThemedText>
+            <ThemedText type="small">現在、FX取引記録は端末間で同期されません。引き継ぎ先にはFXの取引記録が移らないため、注意してください。</ThemedText>
+          </View>
+        </View>
+      )}
       <ThemedText type="small" themeColor="textSecondary">
         {STATUS_TEXT[syncStatus.state]}
         {syncStatus.lastSyncedAt !== null ? `(最後の同期 ${clockText(syncStatus.lastSyncedAt)})` : ''}
@@ -174,6 +224,12 @@ export function LinkCard() {
 
 const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.three },
+  heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
+  headingTitle: { flex: 1, minWidth: 0 },
+  guideButton: { minHeight: 44, flexShrink: 0, justifyContent: 'center', paddingHorizontal: Spacing.one },
+  guide: { gap: Spacing.three, paddingVertical: Spacing.two },
+  guideSection: { gap: Spacing.one },
+  warning: { borderWidth: 2, borderRadius: Spacing.two, padding: Spacing.three, gap: Spacing.two },
   gap: { gap: Spacing.two },
   input: { minHeight: 48, borderWidth: 1, borderRadius: Spacing.two, paddingHorizontal: Spacing.three, fontSize: 18, letterSpacing: 2 },
   button: { minHeight: 48, borderRadius: Spacing.three, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.three },

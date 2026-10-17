@@ -1,5 +1,6 @@
 import { DEMO_RECORDS, DEMO_SETTINGS, eqDrawdown, simulate } from '@nekase/core';
-import { useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg from 'react-native-svg';
@@ -46,13 +47,50 @@ function DemoGraphImage() {
 
 export default function HomeScreen() {
   const theme = useTheme();
-  const { notice } = useNekase();
+  const { notice, ready } = useNekase();
   const [editing, setEditing] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
+  const { section } = useLocalSearchParams<{ section?: string }>();
+  const router = useRouter();
+  const scrollRef = useRef<ScrollView>(null);
+  const graphY = useRef<number | null>(null);
+  const graphScrollPending = useRef(false);
+  const scrollFrame = useRef<number | null>(null);
+
+  const scrollToGraph = useCallback(() => {
+    if (!ready || !graphScrollPending.current || graphY.current === null || !scrollRef.current) return;
+    if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
+    // 配置の更新を待ってから移動し、Web の上部ナビゲーションぶんの余白を残す。
+    scrollFrame.current = requestAnimationFrame(() => {
+      scrollFrame.current = null;
+      if (!graphScrollPending.current || graphY.current === null || !scrollRef.current) return;
+      scrollRef.current.scrollTo({ y: Math.max(0, graphY.current - WebTopInset - Spacing.two), animated: true });
+      graphScrollPending.current = false;
+      // 移動要求を使い終えたら消す。同じリンクを再び押したときは、新しい要求として受け取る。
+      router.setParams({ section: undefined });
+    });
+  }, [ready, router]);
+
+  useFocusEffect(useCallback(() => {
+    graphScrollPending.current = section === 'graph';
+    scrollToGraph();
+    return () => {
+      graphScrollPending.current = false;
+      if (scrollFrame.current !== null) {
+        cancelAnimationFrame(scrollFrame.current);
+        scrollFrame.current = null;
+      }
+    };
+  }, [section, scrollToGraph]));
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scroll}
+          onLayout={scrollToGraph}
+          onContentSizeChange={scrollToGraph}>
         <View style={styles.heading}>
           <ThemedText type="subtitle">ホーム</ThemedText>
           <Pressable
@@ -102,7 +140,15 @@ export default function HomeScreen() {
         )}
         {notice && <ThemedText themeColor="assetInk">{notice}</ThemedText>}
         <TaskCards />
-        <ChartSection />
+        <View
+          collapsable={false}
+          onLayout={(event) => {
+            const { y, width } = event.nativeEvent.layout;
+            graphY.current = width > 0 ? y : null;
+            scrollToGraph();
+          }}>
+          <ChartSection />
+        </View>
         {editing ? (
           <SleepEditForm onClose={() => setEditing(false)} />
         ) : (
