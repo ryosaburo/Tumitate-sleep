@@ -47,7 +47,7 @@ describe("POST /v1/fx/ai-order", () => {
     expect(sys(1)).toContain(AI_PERSONA.high.instruction);
     const all = JSON.stringify(t.calls);
     expect(all).not.toMatch(/accountId|Bearer|"token"/);
-    expect(t.calls[0]!.model).toBe("@cf/meta/llama-3.1-8b-instruct");
+    expect(t.calls[0]!.model).toBe("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
   });
 
   it("モデルは環境変数で入れ替えられる", async () => {
