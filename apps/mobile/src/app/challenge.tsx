@@ -8,7 +8,7 @@ import { RateChart } from '@/components/fx/rate-chart';
 import { TradeLog } from '@/components/fx/trade-log';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Spacing, WebTopInset } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useFx } from '@/hooks/use-fx';
 import { useNekase } from '@/state/nekase-provider';
@@ -137,7 +137,7 @@ export default function ChallengeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
   safeArea: { flex: 1, maxWidth: MaxContentWidth },
-  scroll: { padding: Spacing.four, gap: Spacing.three, paddingBottom: BottomTabInset + 160 },
+  scroll: { padding: Spacing.four, paddingTop: Spacing.four + WebTopInset, gap: Spacing.three, paddingBottom: BottomTabInset + 160 },
   card: { borderWidth: 1, borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
   stats: { flexDirection: 'row', gap: Spacing.three },
   stat: { flex: 1, gap: Spacing.half },
