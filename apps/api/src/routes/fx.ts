@@ -9,7 +9,7 @@ export const fx = new Hono<AppEnv>();
 fx.use(requireAuth);
 
 /** 既定のモデル(JSON モードに対応)。環境変数 AI_MODEL で入れ替えられる。 */
-export const DEFAULT_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+export const DEFAULT_AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 /** 受け取るのは、仮想レート・ゲージの数値・注文額の上限だけ(計画書 §6.6、D17)。それ以外の項目は捨てる。 */
 const AiOrderRequest = z.object({
