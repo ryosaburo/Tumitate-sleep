@@ -27,6 +27,7 @@ export default function SettingsScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [taskMessage, setTaskMessage] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [allocationGuideOpen, setAllocationGuideOpen] = useState(false);
 
   // 保存データの読み込みが終わったら、入力欄に反映する
   useEffect(() => {
@@ -119,7 +120,51 @@ export default function SettingsScreen() {
           </ThemedView>
 
           <ThemedView type="backgroundElement" style={card}>
-            <ThemedText type="smallBold">積立の配分(世界株式 / 債券 / 現金)</ThemedText>
+            <View style={styles.allocationHeader}>
+              <ThemedText type="smallBold" style={styles.allocationTitle}>積立の配分(世界株式 / 債券 / 現金)</ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={allocationGuideOpen ? '積立の配分の説明を閉じる' : '積立の配分の説明を詳しく見る'}
+                accessibilityState={{ expanded: allocationGuideOpen }}
+                onPress={() => setAllocationGuideOpen((open) => !open)}
+                style={styles.allocationGuideButton}>
+                <ThemedText type="small" themeColor="sleepInk" style={styles.underline}>
+                  {allocationGuideOpen ? '閉じる' : '詳しく見る'}
+                </ThemedText>
+              </Pressable>
+            </View>
+            {allocationGuideOpen && (
+              <View style={styles.allocationGuide}>
+                <View style={styles.allocationGuideSection}>
+                  <ThemedText type="smallBold">積立の配分とは？</ThemedText>
+                  <ThemedText type="small">積み立てた仮想のお金を、世界株式・債券・現金の3種類にどのくらい振り分けるかを決めることです。</ThemedText>
+                </View>
+                <View style={styles.allocationGuideSection}>
+                  <ThemedText type="smallBold">世界株式とは？</ThemedText>
+                  <ThemedText type="small">世界中の企業の株式に投資することです。大きく増える可能性がありますが、値下がりするリスクもあります。</ThemedText>
+                </View>
+                <View style={styles.allocationGuideSection}>
+                  <ThemedText type="smallBold">債券とは？</ThemedText>
+                  <ThemedText type="small">国や企業などがお金を借りるために発行するものです。一般的に株式より値動きが小さい傾向がありますが、損失が発生する可能性もあります。</ThemedText>
+                </View>
+                <View style={styles.allocationGuideSection}>
+                  <ThemedText type="smallBold">現金とは？</ThemedText>
+                  <ThemedText type="small">投資せずに保有しておくお金です。ねかせのシミュレーションでは価格が変動しません。</ThemedText>
+                </View>
+                <View style={styles.allocationGuideSection}>
+                  <ThemedText type="smallBold">3つのコースの違い</ThemedText>
+                  <ThemedText type="smallBold">守り重視：</ThemedText>
+                  <ThemedText type="small">値動きをなるべく抑えたい人向け。</ThemedText>
+                  <ThemedText type="smallBold">バランス：</ThemedText>
+                  <ThemedText type="small">安定性と成長の両方を重視したい人向け。</ThemedText>
+                  <ThemedText type="smallBold">成長重視：</ThemedText>
+                  <ThemedText type="small">大きな値動きを受け入れて、資産の成長を目指したい人向け。</ThemedText>
+                </View>
+                <ThemedText type="small" themeColor="textSecondary">
+                  ※このアプリは学習用のシミュレーションです。実際の投資とは結果が異なります。
+                </ThemedText>
+              </View>
+            )}
             {(Object.keys(PRESETS) as PresetKey[]).map((k) => {
               const p = PRESETS[k];
               const on = settings.preset === k;
@@ -198,6 +243,11 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, maxWidth: MaxContentWidth },
   scroll: { padding: Spacing.four, paddingTop: Spacing.four + WebTopInset, gap: Spacing.three, paddingBottom: BottomTabInset + Spacing.six },
   card: { borderWidth: 1, borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  allocationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
+  allocationTitle: { flex: 1, minWidth: 0 },
+  allocationGuideButton: { minHeight: 44, flexShrink: 0, justifyContent: 'center', paddingHorizontal: Spacing.one },
+  allocationGuide: { gap: Spacing.three, paddingVertical: Spacing.two },
+  allocationGuideSection: { gap: Spacing.one },
   row: { flexDirection: 'row', gap: Spacing.three },
   field: { flex: 1, gap: Spacing.one },
   input: { minHeight: 48, borderWidth: 1, borderRadius: Spacing.two, paddingHorizontal: Spacing.three, fontSize: 16 },
