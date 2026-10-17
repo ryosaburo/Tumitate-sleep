@@ -25,6 +25,7 @@ export default function SettingsScreen() {
   const [wake, setWake] = useState(settingsRow.target_wake);
   const [start, setStart] = useState(settingsRow.start_date ?? '');
   const [message, setMessage] = useState<string | null>(null);
+  const [taskMessage, setTaskMessage] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
 
   // 保存データの読み込みが終わったら、入力欄に反映する
@@ -46,9 +47,10 @@ export default function SettingsScreen() {
 
   const onTask = async (t: TaskKey) => {
     const r = toggleTask(settings.tasks, t);
-    if (!r.ok) return setMessage(`⚠ ${r.error}`);
+    if (!r.ok) return setTaskMessage(`⚠ ${r.error}`);
     await saveSettings({ tasks_json: JSON.stringify(r.tasks) });
     setMessage(null);
+    setTaskMessage(null);
   };
 
   const input = [styles.input, { borderColor: theme.line, color: theme.text, backgroundColor: theme.background }];
@@ -109,6 +111,11 @@ export default function SettingsScreen() {
                 </Pressable>
               );
             })}
+            {taskMessage && (
+              <ThemedText type="small" style={{ color: theme.assetInk }}>
+                {taskMessage}
+              </ThemedText>
+            )}
           </ThemedView>
 
           <ThemedView type="backgroundElement" style={card}>
