@@ -11,6 +11,7 @@ import {
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { ChallengeGuide } from '@/components/fx/challenge-guide';
 import { ConfirmPanel } from '@/components/fx/confirm-panel';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -30,6 +31,60 @@ const ERROR_TEXT: Record<OrderError, string> = {
 };
 
 const yen = (n: number) => `¥${n.toLocaleString('ja-JP')}`;
+
+const SIDE_GUIDE_SECTIONS = [
+  {
+    heading: '円安・円高と買い・売り',
+    paragraphs: [
+      'このゲームでは、翌日のドル円が上がるか、下がるかを予想します。150円から151円になると円安、150円から149円になると円高です。',
+      '「買い」はドル円が上がると利益になり、「売り」はドル円が下がると利益になります。予想と反対に動くと損失になります。',
+      '仮想取引なので、実際にドルを購入・売却するわけではありません。',
+    ],
+  },
+];
+
+const AMOUNT_GUIDE_SECTIONS = [
+  {
+    heading: '注文額とは？',
+    paragraphs: [
+      '注文額は、チャレンジで使う金額のことです。',
+      '金額を大きくすると、利益も損失も大きくなります。',
+      '例えば、同じ値動きでも、',
+      '・1,000円で注文すると、利益や損失は小さめ\n・2,000円で注文すると、利益や損失は約2倍',
+      'になります。',
+      '金額は「＋」「－」ボタンで1,000円ずつ変更できます。',
+      '注文できる金額には上限があり、チャレンジ資金や判断力ゲージによって変わります。',
+      '※ 注文額そのものが、チャレンジ資金から引かれるわけではありません。',
+    ],
+  },
+];
+
+const STOP_GUIDE_SECTIONS = [
+  {
+    heading: '損切りとは？',
+    paragraphs: [
+      '損切りは、予想が外れたときに、損失をどこまで許すか決める設定です。',
+      '例えば、「円安になる」と予想したのに、実際には円高になってしまった場合に使われます。',
+    ],
+  },
+  {
+    heading: '3つの設定の違い',
+    paragraphs: [
+      '0.5％：損失を小さく抑えたい人向け\n少し予想と反対に動いただけでも、取引が終了しやすくなります。',
+      '1％：中間の設定\n0.5％と2％の間の設定です。',
+      '2％：少し大きな値動きまで待ちたい人向け\n予想と反対に動いても、0.5％より長く様子を見る設定です。',
+    ],
+  },
+  {
+    heading: '例えば、2,000円で注文した場合',
+    paragraphs: [
+      '・0.5％ → 損失は約10円\n・1％ → 損失は約20円\n・2％ → 損失は約40円',
+      'これは、損切りが実行された場合のゲーム内の目安です。',
+      '損切りの数字は、利益の大きさを決めるものではありません。',
+      '※ このゲームでは翌日の架空レートをもとに判定するため、実際のFXのように値動きを常に監視しているわけではありません。',
+    ],
+  },
+];
 
 /** 注文フォーム。損切りは必須。ゲージが低い日は、理由の選択 → 10 秒 → 再確認を挟む。 */
 export function OrderForm({ fx }: { fx: FxState }) {
@@ -78,6 +133,7 @@ export function OrderForm({ fx }: { fx: FxState }) {
     <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.line }]}>
       <ThemedText type="smallBold">注文(1 日 1 回)</ThemedText>
 
+      <ChallengeGuide title="買い・売りについて" sections={SIDE_GUIDE_SECTIONS} />
       <View style={styles.row}>
         {(['buy', 'sell'] as const).map((s) => (
           <Pressable
@@ -91,6 +147,7 @@ export function OrderForm({ fx }: { fx: FxState }) {
         ))}
       </View>
 
+      <ChallengeGuide title="注文額について" sections={AMOUNT_GUIDE_SECTIONS} />
       <View style={styles.row}>
         <Pressable
           accessibilityRole="button"
@@ -119,6 +176,7 @@ export function OrderForm({ fx }: { fx: FxState }) {
       <ThemedText type="small" themeColor="textSecondary">
         損切り(必須)
       </ThemedText>
+      <ChallengeGuide title="損切りについて" sections={STOP_GUIDE_SECTIONS} />
       <View style={styles.row}>
         {FX_STOP_PCTS.map((p) => (
           <Pressable key={p} accessibilityRole="button" accessibilityState={{ selected: stop === p }} onPress={() => setStop(p)} style={chip(stop === p)}>
