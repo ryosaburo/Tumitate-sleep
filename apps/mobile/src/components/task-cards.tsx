@@ -25,7 +25,7 @@ export function TaskCards() {
   const desc = (t: TaskKey): string => {
     if (t === 'bed') return `目標の${clock(settings.targetBed)}から前後30分以内に眠る(自動)`;
     if (t === 'wake') return `目標の${clock(settings.targetWake)}から前後30分以内に起きる(自動)`;
-    return t === 'screen' ? 'スマホやPCを見ない(自己申告)' : 'コーヒー、緑茶、エナジードリンクなど(自己申告)';
+    return t === 'screen' ? 'スマホやPCを見ない。このアプリは対象外(自己申告)' : 'コーヒー、緑茶、エナジードリンクなど(自己申告)';
   };
 
   return (
