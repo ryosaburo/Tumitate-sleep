@@ -1,20 +1,17 @@
 import {
   DAYS,
-  DEMO_RECORDS,
-  DEMO_SETTINGS,
   WEEK_GOAL,
   madRange,
   monthSummary,
   reveal,
-  simulate,
   weeklySummary,
 } from '@nekase/core';
 import { Link } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { yen } from '@/components/chart/geometry';
+import { ReviewGuide } from '@/components/review-guide';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing, WebTopInset } from '@/constants/theme';
@@ -25,19 +22,80 @@ const NOTE = '学習用のシミュレーションです。実際の売買や換
 /** 色に頼らず、符号で示す。 */
 const pct = (r: number) => `${r >= 0 ? '＋' : '−'}${(Math.abs(r) * 100).toFixed(1)}%`;
 const mins = (m: number | null) => (m === null ? '—' : `約 ${Math.round(m)} 分`);
-const DEMO_SIM = simulate(DEMO_RECORDS, DEMO_SETTINGS);
-const DEMO_SUMMARY = monthSummary(DEMO_RECORDS, DEMO_SIM, DEMO_SETTINGS.targetBed, DAYS)!;
-const DEMO_WEEKS = weeklySummary(DEMO_RECORDS, DEMO_SIM, DEMO_SETTINGS.targetBed, DAYS);
-const DEMO_REVEAL = reveal(DEMO_SIM, DEMO_SETTINGS.preset);
-const DEMO_FIRST = madRange(DEMO_RECORDS, 0, 6, DEMO_SETTINGS.targetBed);
-const DEMO_RECENT = madRange(DEMO_RECORDS, DAYS - 7, DAYS - 1, DEMO_SETTINGS.targetBed);
-const DEMO_LAST = DEMO_SIM[DAYS - 1]!;
+
+const USAGE_GUIDE = [
+  {
+    heading: '振り返り画面とは？',
+    paragraphs: [
+      'この画面では、30日間の睡眠習慣と、積立投資の結果を振り返ることができます。',
+      '確認できるのは、主に次の3つです。',
+      '・睡眠習慣：何日クリアできたか、目標の就寝時刻に近づけたか\n・積立投資：どれくらい積み立てて、資産がどう変化したか\n・30日間の結果：続けたことで、どんな変化があったか',
+      '※ 30日間は、記録した日数ではなく、チャレンジ開始日から数えます。',
+    ],
+  },
+];
+
+const WEEKLY_GUIDE = [
+  {
+    heading: '週ごとの振り返りとは？',
+    paragraphs: [
+      '1週間に何日クリアできたかを確認できます。',
+      '7日間のうち5日以上クリアすると、その週は達成です。',
+      '丸の意味は次のとおりです。',
+      '・✓：その日の目標をクリア\n・○：クリアできなかった日、または記録がない日\n・・：まだ集計していない日',
+      '「就寝のズレ」は、目標の就寝時刻から平均何分ずれていたかを表しています。',
+      '例えば、目標が23:30の場合、23:10でも23:50でも「20分のズレ」です。',
+      '※ 週は月曜日からではなく、チャレンジ開始日から7日ずつ数えます。',
+    ],
+  },
+];
+
+const ASSET_GUIDE = [
+  { heading: '資産について', paragraphs: [] },
+  {
+    heading: '積立元本とは？',
+    paragraphs: [
+      'これまでの睡眠習慣の達成によって、積み立てた仮想のお金の合計です。',
+      '例えば、1日に3,000円ずつ10日間積み立てると、元本は30,000円になります。',
+    ],
+  },
+  {
+    heading: '評価額とは？',
+    paragraphs: [
+      '積み立てたお金が、値動きによって今いくらになっているかを表します。',
+      '例えば、',
+      '・積立元本：30,000円\n・評価額：31,000円',
+      'なら、1,000円の利益が出ている状態です。',
+      '反対に、評価額が29,000円なら1,000円の損失です。',
+    ],
+  },
+  {
+    heading: '複利の分とは？',
+    paragraphs: [
+      '運用によって増えたり減ったりしたお金にも、その後の値動きが影響することを「複利」といいます。',
+      '例えば、増えた利益にも次の値動きが影響することで、資産がさらに増える場合があります。',
+      '※ 「複利の分」は評価額に含まれており、別にもらえるお金ではありません。',
+    ],
+  },
+];
+
+const DRAWDOWN_GUIDE = [
+  {
+    heading: '何を比べているの？',
+    paragraphs: [
+      '30日間の中で、いつ積み立てたお金が、最後にどうなったのかを比べています。',
+      '積み立てた時期を、次の3つに分けます。',
+      '・下落の前：大きく値下がりする前に積み立てたお金\n・下落の最中：値下がりしている間に積み立てたお金\n・回復のあと：値下がりが一番大きかった日より後に積み立てたお金',
+      'それぞれのお金を30日目まで持っていた場合の結果を表示しています。',
+      '※ 架空の相場によるシミュレーションで、実際の投資でも同じ結果になるとは限りません。',
+    ],
+  },
+];
 
 export default function ReviewScreen() {
   const theme = useTheme();
   const { ready, chart, setDemo } = useNekase();
   const { sim, records, settings, elapsed, demo } = chart;
-  const [showExplanation, setShowExplanation] = useState(false);
 
   const summary = monthSummary(records, sim, settings.targetBed, elapsed);
   const weeks = elapsed > 0 ? weeklySummary(records, sim, settings.targetBed, elapsed) : [];
@@ -53,117 +111,7 @@ export default function ReviewScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scroll}>
-          <View style={styles.heading}>
-            <ThemedText type="subtitle">振り返り</ThemedText>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded: showExplanation }}
-              onPress={() => setShowExplanation(!showExplanation)}
-              style={styles.explanationButton}>
-              <ThemedText type="small" themeColor="sleepInk" style={styles.underline}>
-                (振り返りの説明)
-              </ThemedText>
-            </Pressable>
-          </View>
-          {showExplanation && (
-            <ThemedView type="backgroundElement" style={[styles.explanation, { borderColor: theme.line }]}>
-              <View style={styles.guideSection}>
-                <ThemedText type="smallBold">1. 週ごとの振り返り</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  1週間ごとに、行動課題をクリアした日数、就寝時刻のズレの平均、週末時点の仮想資産を確認できます。週5日クリアすると、その週は達成です。就寝時刻のズレは記録が3日分以上ある週に表示します。
-                </ThemedText>
-                {DEMO_WEEKS.map((w) => (
-                  <ThemedView key={w.index} type="background" style={[styles.demoCard, { borderColor: theme.line }]}>
-                    <View style={styles.head}>
-                      <ThemedText type="smallBold">
-                        デモ: 第 {w.index + 1} 週({w.from + 1}〜{w.to + 1}日目)
-                      </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {w.achieved ? '達成 ✓' : `${WEEK_GOAL} 日クリアで達成`}
-                      </ThemedText>
-                    </View>
-                    <View style={styles.dots} accessibilityLabel={`デモのクリア ${w.clearDays} 日`}>
-                      {Array.from({ length: 7 }, (_, i) => {
-                        const day = w.from + i;
-                        const inRange = day <= w.to;
-                        const clear = inRange && DEMO_SIM[day]!.stat.clear;
-                        return (
-                          <View
-                            key={i}
-                            style={[
-                              styles.dot,
-                              { borderColor: inRange ? theme.sleep : theme.line },
-                              clear && { backgroundColor: theme.sleep },
-                            ]}>
-                            <ThemedText type="small" style={{ color: clear ? theme.onSleep : theme.textSecondary }}>
-                              {clear ? '✓' : inRange ? '' : '・'}
-                            </ThemedText>
-                          </View>
-                        );
-                      })}
-                      <ThemedText type="small">{w.clearDays} / 7 日</ThemedText>
-                    </View>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      就寝のズレの平均: {w.mad === null ? '記録が 3 日分以上あると表示します' : mins(w.mad)}
-                    </ThemedText>
-                    <ThemedText type="small">週末の評価額: {yen(w.endValue)}</ThemedText>
-                  </ThemedView>
-                ))}
-                <ThemedText type="small" themeColor="textSecondary">
-                  以下は既存のサンプル30日分から作った表示例です。あなたの記録や資産には反映されません。
-                </ThemedText>
-              </View>
-
-              <View style={styles.guideSection}>
-                <ThemedText type="smallBold">2. 30日目の答え合わせ</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  30日分の記録がそろうと、初週と最後の7日の就寝時刻のズレ、積立元本と評価額、仮想の値下がり期間に積立を続けた場合の結果を振り返れます。
-                </ThemedText>
-                <ThemedView type="background" style={[styles.demoCard, { borderColor: theme.line }]}>
-                  <ThemedText type="smallBold">デモ: 30日間のまとめ</ThemedText>
-                  {DEMO_SUMMARY.lines.map((line) => (
-                    <ThemedText key={line} type="small">{line}</ThemedText>
-                  ))}
-                  <ThemedText type="small" themeColor="textSecondary">
-                    記録 {DEMO_SUMMARY.recorded} / {DEMO_SUMMARY.days} 日 ・ クリア {DEMO_SUMMARY.clearDays} 日 ・
-                    達成した週 {DEMO_SUMMARY.achievedWeeks} / {DEMO_SUMMARY.weekCount} ・ 積立元本 {yen(DEMO_SUMMARY.principal)} → 評価額 {yen(DEMO_SUMMARY.value)}
-                  </ThemedText>
-                  <View style={[styles.demoSubsection, { borderTopColor: theme.line }]}>
-                    <ThemedText type="smallBold">就寝のズレ</ThemedText>
-                    <ThemedText type="small">初週: {mins(DEMO_FIRST)}</ThemedText>
-                    <ThemedText type="small">直近 7 日: {mins(DEMO_RECENT)}</ThemedText>
-                  </View>
-                  <View style={[styles.demoSubsection, { borderTopColor: theme.line }]}>
-                    <ThemedText type="smallBold">資産</ThemedText>
-                    <ThemedText type="small">
-                      積立元本 {yen(DEMO_LAST.principal)} → 評価額 {yen(DEMO_LAST.value)}
-                    </ThemedText>
-                    <ThemedText type="small">複利の分: {yen(DEMO_LAST.comp)}</ThemedText>
-                  </View>
-                  <View style={[styles.demoSubsection, { borderTopColor: theme.line }]}>
-                    <ThemedText type="smallBold">値下がりの最中も続けた結果</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      世界株式は、{DEMO_REVEAL.peakDay}〜{DEMO_REVEAL.troughDay} 日目に最大 {pct(DEMO_REVEAL.maxDD)} 下がりました。
-                    </ThemedText>
-                    {DEMO_REVEAL.groups.map((g) => (
-                      <View key={g.n} style={styles.row}>
-                        <View style={styles.grow}>
-                          <ThemedText type="small">{g.n}</ThemedText>
-                          <ThemedText type="small" themeColor="textSecondary">
-                            {g.a}〜{g.b} 日目 / 積立 {g.days} 日・{yen(g.cost)}
-                          </ThemedText>
-                        </View>
-                        <ThemedText type="smallBold">{g.ret === null ? '積立なし' : pct(g.ret)}</ThemedText>
-                      </View>
-                    ))}
-                  </View>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    結果を知ってから分かることで、同じ展開になる保証はありません。値動きは仮想データです。
-                  </ThemedText>
-                </ThemedView>
-              </View>
-            </ThemedView>
-          )}
+          <ReviewGuide title="振り返り" titleType="subtitle" openLabel="使い方を見る" sections={USAGE_GUIDE} />
           {!ready ? null : elapsed === 0 ? (
             <ThemedView type="backgroundElement" style={card}>
               <ThemedText type="small" themeColor="textSecondary">
@@ -196,7 +144,7 @@ export default function ReviewScreen() {
                 </ThemedView>
               )}
 
-              <ThemedText type="smallBold">週ごとの振り返り</ThemedText>
+              <ReviewGuide title="週ごとの振り返り" sections={WEEKLY_GUIDE} />
               {weeks.map((w) => (
                 <ThemedView key={w.index} type="backgroundElement" style={card}>
                   <View style={styles.head}>
@@ -254,7 +202,7 @@ export default function ReviewScreen() {
                   </ThemedView>
 
                   <ThemedView type="backgroundElement" style={card}>
-                    <ThemedText type="smallBold">資産</ThemedText>
+                    <ReviewGuide title="資産" sections={ASSET_GUIDE} />
                     <ThemedText type="small">
                       積立元本 {yen(last.principal)} → 評価額 {yen(last.value)}
                     </ThemedText>
@@ -265,7 +213,7 @@ export default function ReviewScreen() {
                   </ThemedView>
 
                   <ThemedView type="backgroundElement" style={card}>
-                    <ThemedText type="smallBold">値下がりの最中も続けた結果</ThemedText>
+                    <ReviewGuide title="値下がりの最中も続けた結果" sections={DRAWDOWN_GUIDE} />
                     <ThemedText type="small" themeColor="textSecondary">
                       世界株式は、{rv.peakDay}〜{rv.troughDay} 日目に最大 {pct(rv.maxDD)} 下がりました。積立した時期ごとの増減です。
                     </ThemedText>
@@ -306,17 +254,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
   safeArea: { flex: 1, maxWidth: MaxContentWidth },
   scroll: { padding: Spacing.four, paddingTop: Spacing.four + WebTopInset, gap: Spacing.three, paddingBottom: BottomTabInset + Spacing.four },
-  heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
-  explanationButton: { minHeight: 44, justifyContent: 'center' },
-  underline: { textDecorationLine: 'underline' },
-  explanation: { borderWidth: 1, borderRadius: Spacing.two, padding: Spacing.three, gap: Spacing.three },
-  guideSection: { gap: Spacing.one },
-  demoCard: { borderWidth: 1, borderRadius: Spacing.two, padding: Spacing.three, gap: Spacing.two },
   card: { borderWidth: 1, borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dots: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   dot: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, borderTopWidth: 1, paddingTop: Spacing.two },
-  demoSubsection: { borderTopWidth: 1, paddingTop: Spacing.two, gap: Spacing.one },
   grow: { flex: 1 },
 });
