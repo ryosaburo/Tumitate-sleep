@@ -208,6 +208,9 @@ export default function SettingsScreen() {
                 </Pressable>
               );
             })}
+            <ThemedText type="small" themeColor="textSecondary">
+              ※ 「寝る1時間前に画面を閉じる」では、このアプリの画面は対象外です。
+            </ThemedText>
             {taskMessage && (
               <ThemedText type="small" style={{ color: theme.assetInk }}>
                 {taskMessage}
