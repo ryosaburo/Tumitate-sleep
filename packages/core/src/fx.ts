@@ -23,6 +23,12 @@ export type StopPct = (typeof FX_STOP_PCTS)[number];
 export const GAUGE_MAD_MAX = 90;
 /** 記録が足りないときのゲージ。 */
 export const GAUGE_DEFAULT = 50;
+/** 目標の就寝〜起床がこの分数未満だと、ゲージの上限を下げはじめる(6 時間)。 */
+export const GAUGE_SPAN_FULL = 360;
+/** 目標の間隔がこの分数以下なら、上限は最小(4 時間)。 */
+export const GAUGE_SPAN_MIN = 240;
+/** ゲージの上限の下限(0.6)。 */
+export const GAUGE_SPAN_FLOOR = 0.6;
 export const GAUGE_HIGH = 70;
 /** これ未満が「低」。確認ステップと注文額の半減が入る。 */
 export const GAUGE_LOW = 40;
@@ -64,17 +70,34 @@ export const FX_RATES: readonly number[] = [
 export type GaugeLevel = "high" | "mid" | "low";
 
 /**
+ * 目標の就寝〜起床の間隔による、ゲージの上限の係数(0.6〜1)。
+ * 6 時間以上は 1。それより短いと直線で下がり、4 時間以下で 0.6。
+ * 実際の睡眠ではなく、設定した目標だけを見る。
+ */
+export function sleepSpanFactor(targetBed: number, targetWake: number): number {
+  const span = targetWake - targetBed;
+  if (span >= GAUGE_SPAN_FULL) return 1;
+  if (span <= GAUGE_SPAN_MIN) return GAUGE_SPAN_FLOOR;
+  const t = (span - GAUGE_SPAN_MIN) / (GAUGE_SPAN_FULL - GAUGE_SPAN_MIN);
+  return GAUGE_SPAN_FLOOR + (1 - GAUGE_SPAN_FLOOR) * t;
+}
+
+/**
  * 判断力ゲージ(0〜100)。dayIndex 日目を含む直近 7 日の就寝のズレだけで決める。
  * 睡眠時間やスコアは使わない。記録のある日が 3 日未満なら 50。
+ * targetWake を渡すと、目標の間隔が短いときに上限を下げる(sleepSpanFactor)。
  */
 export function gauge(
   records: readonly (DayRecord | null)[],
   dayIndex: number,
   targetBed: number,
+  targetWake?: number,
 ): number {
   const mad = madRange(records, Math.max(0, dayIndex - 6), dayIndex, targetBed);
   if (mad == null) return GAUGE_DEFAULT;
-  return Math.round(100 * Math.min(Math.max(1 - mad / GAUGE_MAD_MAX, 0), 1));
+  const base = Math.min(Math.max(1 - mad / GAUGE_MAD_MAX, 0), 1);
+  const cap = targetWake == null ? 1 : sleepSpanFactor(targetBed, targetWake);
+  return Math.round(100 * base * cap);
 }
 
 export function gaugeLevel(g: number): GaugeLevel {

@@ -120,7 +120,7 @@ export function fxState(input: FxInput): FxState {
   const fund = fundBalance(grantDays, settled);
 
   const idx = Math.min(Math.max(dayIndex ?? 0, 0), DAYS - 1);
-  const g = gauge(records, idx, settings.targetBed);
+  const g = gauge(records, idx, settings.targetBed, settings.targetWake);
   return {
     phase,
     dayIndex,
