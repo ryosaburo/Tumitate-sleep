@@ -8,6 +8,7 @@ import {
   fxPnl,
   gauge,
   gaugeLevel,
+  sleepSpanFactor,
   grantFund,
   hasRateFor,
   isNightLocked,
@@ -26,6 +27,26 @@ import type { DayRecord } from "./types";
 const rec = (bed: string): DayRecord => ({ bed: ax(bed), wake: null, screen: false, caffeine: false });
 const TB = DEMO_SETTINGS.targetBed; // 23:30
 const TW = DEMO_SETTINGS.targetWake; // 06:30
+
+describe("目標の睡眠間隔によるゲージの上限", () => {
+  const span = (h: number) => sleepSpanFactor(ax("23:00"), ax("23:00") + h * 60);
+  it("6 時間以上なら下げない", () => {
+    expect(span(6)).toBe(1);
+    expect(span(8)).toBe(1);
+  });
+  it("6 時間未満は直線で下げ、4 時間以下で 0.6", () => {
+    expect(span(5)).toBeCloseTo(0.8);
+    expect(span(4)).toBeCloseTo(0.6);
+    expect(span(2)).toBeCloseTo(0.6);
+  });
+  it("規則的でも、短い間隔の目標ではゲージが上限で止まる", () => {
+    const rs = [rec("23:30"), rec("23:30"), rec("23:30")];
+    expect(gauge(rs, 2, TB, ax("04:30"))).toBe(80); // 5 時間
+    expect(gauge(rs, 2, TB, ax("03:30"))).toBe(60); // 4 時間
+    expect(gauge(rs, 2, TB, TW)).toBe(100); // 7 時間
+    expect(gauge(rs, 2, TB)).toBe(100); // 起床を渡さなければ従来どおり
+  });
+});
 
 describe("判断力ゲージ", () => {
   it("記録が 3 日未満なら 50", () => {

@@ -1,4 +1,4 @@
-import { clock, normalizeStartDate, normalizeTime, PRESETS, toggleTask, type PresetKey, type TaskKey } from '@nekase/core';
+import { ax, clock, normalizeStartDate, normalizeTime, PRESETS, sleepSpanFactor, toggleTask, type PresetKey, type TaskKey } from '@nekase/core';
 import { Link } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -53,6 +53,11 @@ export default function SettingsScreen() {
     setWake(settingsRow.target_wake);
     setStart(settingsRow.start_date ?? '');
   }, [ready, settingsRow.target_bed, settingsRow.target_wake, settingsRow.start_date]);
+
+  // 入力中の目標の間隔が短いときだけ、ゲージの説明を出す。
+  const nb = normalizeTime(bed);
+  const nw = normalizeTime(wake);
+  const spanFactor = nb && nw ? sleepSpanFactor(ax(nb), ax(nw)) : 1;
 
   const saveTimes = async () => {
     const b = normalizeTime(bed);
@@ -173,6 +178,11 @@ export default function SettingsScreen() {
                 <ThemedText type="small" themeColor="sleepInk" style={styles.underline}>今日にする</ThemedText>
               </Pressable>
             </View>
+            {spanFactor < 1 && (
+              <ThemedText type="small" themeColor="textSecondary">
+                ⚠ 就寝から起床までの目標が 6 時間より短いと、チャレンジの判断力ゲージが上がりにくくなります(最大でも約 {Math.round(spanFactor * 100)}%)。ゲージは行動の規則性の目安で、必要な睡眠時間は人によって違います。
+              </ThemedText>
+            )}
             <Pressable accessibilityRole="button" onPress={saveTimes} style={[styles.button, { backgroundColor: theme.sleep }]}>
               <ThemedText type="smallBold" style={{ color: theme.onSleep }}>保存</ThemedText>
             </Pressable>
