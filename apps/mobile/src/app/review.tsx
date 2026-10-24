@@ -1,4 +1,11 @@
-import { DAYS, WEEK_GOAL, madRange, monthSummary, reveal, weeklySummary } from '@nekase/core';
+import {
+  DAYS,
+  WEEK_GOAL,
+  madRange,
+  monthSummary,
+  reveal,
+  weeklySummary,
+} from '@nekase/core';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
