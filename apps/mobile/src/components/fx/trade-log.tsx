@@ -1,6 +1,7 @@
 import { gaugeLevel, type FxReview, type FxTrade, type GaugeLevel } from '@nekase/core';
 import { StyleSheet, View } from 'react-native';
 
+import { ChallengeGuide } from '@/components/fx/challenge-guide';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -11,12 +12,43 @@ const yen = (n: number) => `¥${Math.abs(n).toLocaleString('ja-JP')}`;
 /** 色に頼らず、符号で示す。 */
 const signed = (n: number) => (n > 0 ? `＋${yen(n)}` : n < 0 ? `−${yen(n)}` : yen(0));
 
+const LOG_GUIDE_SECTIONS = [
+  {
+    heading: '取引ログとは？',
+    paragraphs: [
+      'これまでに行った注文と、その結果を確認できる場所です。新しい注文から順番に表示されます。',
+    ],
+  },
+  {
+    heading: '約定（やくじょう）と決済（けっさい）',
+    paragraphs: [
+      '約定は、注文が成立して取引が始まることです。約定レートは、そのときのドル円の価格です。',
+      '決済は、取引を終えて利益や損失を確定することです。決済レートは、そのときのドル円の価格です。',
+    ],
+  },
+  {
+    heading: '保有中・損益・損切り',
+    paragraphs: [
+      '保有中は、注文は成立していますが、まだ結果が確定していない状態です。',
+      '損益（そんえき）は、取引によって増減した金額です。プラスは利益、マイナスは損失を表します。',
+      '損切りは、予想と反対に値動きした場合に、設定した損切りラインで取引を終了することです。このゲームでは翌日の架空レートで判定します。',
+    ],
+  },
+  {
+    heading: '判断の過程も振り返る',
+    paragraphs: [
+      '注文した日の判断力ゲージを確認できます。確認ステップで選んだ理由や、AIが返した理由がある場合は、それも表示されます。',
+      '利益や損失だけでなく、その日にどのように判断したかも振り返ってみましょう。',
+    ],
+  },
+];
+
 /** 取引ログと、ゲージ別の成績。10 件に満たないうちは「参考値」。因果は断定しない。 */
 export function TradeLog({ trades, review, aiReview }: { trades: readonly FxTrade[]; review: FxReview; aiReview: FxReview }) {
   const theme = useTheme();
   return (
     <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.line }]}>
-      <ThemedText type="smallBold">取引ログ</ThemedText>
+      <ChallengeGuide title="取引ログ" sections={LOG_GUIDE_SECTIONS} />
       {trades.length === 0 ? (
         <ThemedText type="small" themeColor="textSecondary">
           まだ取引がありません。

@@ -2,6 +2,7 @@ import { AI_PERSONA, gaugeLevel, type FxState } from '@nekase/core';
 import { useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 
+import { ChallengeGuide } from '@/components/fx/challenge-guide';
 import { ConfirmPanel } from '@/components/fx/confirm-panel';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -22,6 +23,16 @@ const BLOCK_TEXT: Record<string, string> = {
   need_confirm: '確認ステップを終えてから、お願いします。',
   no_rate: '今日は注文できません。',
 };
+
+const AI_GUIDE_SECTIONS = [
+  {
+    heading: 'AIがしてくれること',
+    paragraphs: [
+      '今日の注文について、翌日のドル円が上がるか下がるかを考え、「買い」「売り」「見送り」から選びます。注文する場合は、注文額と損切り幅も決めます。',
+      '毎日自動で注文するわけではありません。利用者がボタンを押して依頼した日に判断します。',
+    ],
+  },
+];
 
 /** 「AI にまかせる」(任意)。就寝の規則性(ゲージ)に合わせた AI が、今日の注文を決める。計画書 §6.6 */
 export function AiDelegate({ fx }: { fx: FxState }) {
@@ -45,15 +56,18 @@ export function AiDelegate({ fx }: { fx: FxState }) {
 
   return (
     <ThemedView type="backgroundElement" style={[styles.card, { borderColor: theme.line }]}>
-      <ThemedText type="smallBold">AI にまかせる(任意)</ThemedText>
+      <ChallengeGuide title="AI にまかせる(任意)" sections={AI_GUIDE_SECTIONS} />
       <ThemedText type="small" themeColor="textSecondary">
-        今日の注文を、AI が決めて確定します(1 日 1 回。自分の注文の代わりです)。AI は、今日のゲージ(目安)に合わせた設定で判断します。
+        AI への依頼は、自分の注文の代わりです(1 日 1 回)。AI は、今日のゲージ(目安)に合わせた設定で判断します。
         今日の設定: 「{persona.label}」。
       </ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
         この設定は学習用の演出です。睡眠不足が実際にこうなると示すものではなく、結果は保証されません。投資助言ではありません。損切り・上限・夜間ロックは、AI の注文にも同じく適用されます。
       </ThemedText>
 
+      <ThemedText type="small" themeColor="textSecondary">
+        AIの回答後、確認なしで注文または見送りが確定します。判断力ゲージが低い日は、依頼前に追加の確認があります。
+      </ThemedText>
       {confirming ? (
         <ConfirmPanel
           intro="就寝時刻がばらついている傾向があります(目安)。AI にまかせる理由を選んでください。"

@@ -1,9 +1,17 @@
-import { DAYS, WEEK_GOAL, madRange, monthSummary, reveal, weeklySummary } from '@nekase/core';
+import {
+  DAYS,
+  WEEK_GOAL,
+  madRange,
+  monthSummary,
+  reveal,
+  weeklySummary,
+} from '@nekase/core';
 import { Link } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { yen } from '@/components/chart/geometry';
+import { ReviewGuide } from '@/components/review-guide';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing, WebTopInset } from '@/constants/theme';
@@ -14,6 +22,75 @@ const NOTE = '学習用のシミュレーションです。実際の売買や換
 /** 色に頼らず、符号で示す。 */
 const pct = (r: number) => `${r >= 0 ? '＋' : '−'}${(Math.abs(r) * 100).toFixed(1)}%`;
 const mins = (m: number | null) => (m === null ? '—' : `約 ${Math.round(m)} 分`);
+
+const USAGE_GUIDE = [
+  {
+    heading: '振り返り画面とは？',
+    paragraphs: [
+      'この画面では、30日間の睡眠習慣と、積立投資の結果を振り返ることができます。',
+      '確認できるのは、主に次の3つです。',
+      '・睡眠習慣：何日クリアできたか、目標の就寝時刻に近づけたか\n・積立投資：どれくらい積み立てて、資産がどう変化したか\n・30日間の結果：続けたことで、どんな変化があったか',
+      '※ 30日間は、記録した日数ではなく、チャレンジ開始日から数えます。',
+    ],
+  },
+];
+
+const WEEKLY_GUIDE = [
+  {
+    heading: '週ごとの振り返りとは？',
+    paragraphs: [
+      '1週間に何日クリアできたかを確認できます。',
+      '7日間のうち5日以上クリアすると、その週は達成です。',
+      '丸の意味は次のとおりです。',
+      '・✓：その日の目標をクリア\n・○：クリアできなかった日、または記録がない日\n・・：まだ集計していない日',
+      '「就寝のズレ」は、目標の就寝時刻から平均何分ずれていたかを表しています。',
+      '例えば、目標が23:30の場合、23:10でも23:50でも「20分のズレ」です。',
+      '※ 週は月曜日からではなく、チャレンジ開始日から7日ずつ数えます。',
+    ],
+  },
+];
+
+const ASSET_GUIDE = [
+  { heading: '資産について', paragraphs: [] },
+  {
+    heading: '積立元本とは？',
+    paragraphs: [
+      'これまでの睡眠習慣の達成によって、積み立てた仮想のお金の合計です。',
+      '例えば、1日に3,000円ずつ10日間積み立てると、元本は30,000円になります。',
+    ],
+  },
+  {
+    heading: '評価額とは？',
+    paragraphs: [
+      '積み立てたお金が、値動きによって今いくらになっているかを表します。',
+      '例えば、',
+      '・積立元本：30,000円\n・評価額：31,000円',
+      'なら、1,000円の利益が出ている状態です。',
+      '反対に、評価額が29,000円なら1,000円の損失です。',
+    ],
+  },
+  {
+    heading: '複利の分とは？',
+    paragraphs: [
+      '運用によって増えたり減ったりしたお金にも、その後の値動きが影響することを「複利」といいます。',
+      '例えば、増えた利益にも次の値動きが影響することで、資産がさらに増える場合があります。',
+      '※ 「複利の分」は評価額に含まれており、別にもらえるお金ではありません。',
+    ],
+  },
+];
+
+const DRAWDOWN_GUIDE = [
+  {
+    heading: '何を比べているの？',
+    paragraphs: [
+      '30日間の中で、いつ積み立てたお金が、最後にどうなったのかを比べています。',
+      '積み立てた時期を、次の3つに分けます。',
+      '・下落の前：大きく値下がりする前に積み立てたお金\n・下落の最中：値下がりしている間に積み立てたお金\n・回復のあと：値下がりが一番大きかった日より後に積み立てたお金',
+      'それぞれのお金を30日目まで持っていた場合の結果を表示しています。',
+      '※ 架空の相場によるシミュレーションで、実際の投資でも同じ結果になるとは限りません。',
+    ],
+  },
+];
 
 export default function ReviewScreen() {
   const theme = useTheme();
@@ -34,7 +111,7 @@ export default function ReviewScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scroll}>
-          <ThemedText type="subtitle">振り返り</ThemedText>
+          <ReviewGuide title="振り返り" titleType="subtitle" openLabel="使い方を見る" sections={USAGE_GUIDE} />
           {!ready ? null : elapsed === 0 ? (
             <ThemedView type="backgroundElement" style={card}>
               <ThemedText type="small" themeColor="textSecondary">
@@ -67,7 +144,7 @@ export default function ReviewScreen() {
                 </ThemedView>
               )}
 
-              <ThemedText type="smallBold">週ごとの振り返り</ThemedText>
+              <ReviewGuide title="週ごとの振り返り" sections={WEEKLY_GUIDE} />
               {weeks.map((w) => (
                 <ThemedView key={w.index} type="backgroundElement" style={card}>
                   <View style={styles.head}>
@@ -125,7 +202,7 @@ export default function ReviewScreen() {
                   </ThemedView>
 
                   <ThemedView type="backgroundElement" style={card}>
-                    <ThemedText type="smallBold">資産</ThemedText>
+                    <ReviewGuide title="資産" sections={ASSET_GUIDE} />
                     <ThemedText type="small">
                       積立元本 {yen(last.principal)} → 評価額 {yen(last.value)}
                     </ThemedText>
@@ -136,7 +213,7 @@ export default function ReviewScreen() {
                   </ThemedView>
 
                   <ThemedView type="backgroundElement" style={card}>
-                    <ThemedText type="smallBold">値下がりの最中も続けた結果</ThemedText>
+                    <ReviewGuide title="値下がりの最中も続けた結果" sections={DRAWDOWN_GUIDE} />
                     <ThemedText type="small" themeColor="textSecondary">
                       世界株式は、{rv.peakDay}〜{rv.troughDay} 日目に最大 {pct(rv.maxDD)} 下がりました。積立した時期ごとの増減です。
                     </ThemedText>
